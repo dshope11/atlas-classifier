@@ -1,0 +1,32 @@
+# Data
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Logs
+logs/*
+!logs/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Claude Code
+.claude/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp

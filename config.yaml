@@ -1,0 +1,46 @@
+# atlas-classifier — training configuration
+#
+# All keys correspond to fields in src/config.py:TrainingConfig. Unknown keys
+# raise an error at load time. Defaults shown match the dataclass — change here
+# rather than in code.
+
+# --- Architecture --------------------------------------------------------
+hidden_sizes: [128, 64, 32]
+dropout: 0.3
+input_noise_std: 0.01      # GaussianNoise stddev added to inputs (training only)
+
+# --- Training ------------------------------------------------------------
+lr: 0.001
+epochs: 200
+patience: 15               # early stopping (epochs without val_loss improvement)
+batch_size: 256
+working_point_signal_eff: 0.30   # threshold for per-epoch significance diagnostic
+
+# --- Data ----------------------------------------------------------------
+lumi: 36.1                 # fb^-1 — see notes/data_sources.md for choice
+train_val_test_split: [0.70, 0.15, 0.15]
+random_seed: 42
+
+# --- LR scheduling (ReduceLROnPlateau) -----------------------------------
+lr_patience: 10
+lr_factor: 0.5
+
+# --- Event selection cuts (DSL — see src/utils.py:evaluate_cuts) --------
+# Pre-cut scalars (lead_lep_pt, sublead_lep_pt, lep_charge_product) are
+# computed in data_loading.py before evaluate_cuts is called.
+# 2025 release branch names: lep_n, jet_n; energies/momenta in GeV.
+cuts:
+  and:
+    - ["jet_n", "== 0"]
+    - ["lep_n", "== 2"]
+    - ["lep_charge_product", "< 0"]    # opposite sign
+    - ["lead_lep_pt", "> 25"]          # 25 GeV
+    - ["sublead_lep_pt", "> 15"]       # 15 GeV
+
+# --- Paths (relative to repo root) ---------------------------------------
+raw_dir: "data/raw"
+processed_path: "data/processed/events.h5"
+checkpoint_path: "data/processed/best_model.pt"
+loss_history_path: "data/processed/loss_history.json"
+log_path: "logs/training.log"
+output_dir: "data/processed/eval"
