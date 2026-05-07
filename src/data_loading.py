@@ -6,8 +6,9 @@ For each sample registered in :mod:`src.sample_info`:
    ``uproot.TTree.iterate`` so the 1.9 GB ttbar file does not blow memory.
 2. Filter to events with exactly two leptons (otherwise lep[:, 0/1] indexing
    would be unsafe — the ``2to4lep`` skim guarantees ≥2 but allows up to 4).
-3. Compute the pre-cut scalars (``lead_lep_pt``, ``sublead_lep_pt``,
-   ``lep_charge_product``) needed by the cut DSL.
+3. Compute the pre-cut scalars needed by the cut DSL:
+   ``lead_lep_pt``, ``sublead_lep_pt``, ``lep_charge_product``,
+   ``lep_type_product`` (143 for eμ), ``met``, ``mll``, ``dphi_ll_met``.
 4. Apply event-selection cuts via :func:`src.utils.evaluate_cuts` against the
    ``cuts`` block in ``config.yaml``.
 5. Compute the per-event physics weight using the canonical 2025-release
@@ -90,14 +91,41 @@ def _process_chunk(
         return np.zeros(0, dtype=OUTPUT_DTYPE)
 
     # Pre-cut scalars referenced by config.yaml's cuts DSL
-    lep_pt = arrays["lep_pt"]
+    lep_pt     = arrays["lep_pt"]
     lep_charge = arrays["lep_charge"]
+    lep_type   = arrays["lep_type"]
+
+    pt0  = ak.to_numpy(lep_pt[:, 0]).astype(np.float64)
+    pt1  = ak.to_numpy(lep_pt[:, 1]).astype(np.float64)
+    phi0 = ak.to_numpy(arrays["lep_phi"][:, 0]).astype(np.float64)
+    phi1 = ak.to_numpy(arrays["lep_phi"][:, 1]).astype(np.float64)
+    eta0 = ak.to_numpy(arrays["lep_eta"][:, 0]).astype(np.float64)
+    eta1 = ak.to_numpy(arrays["lep_eta"][:, 1]).astype(np.float64)
+    e0   = ak.to_numpy(arrays["lep_e"][:, 0]).astype(np.float64)
+    e1   = ak.to_numpy(arrays["lep_e"][:, 1]).astype(np.float64)
+
+    # Dilepton system — shared intermediates for mll and dphi_ll_met
+    px_ll = pt0 * np.cos(phi0) + pt1 * np.cos(phi1)
+    py_ll = pt0 * np.sin(phi0) + pt1 * np.sin(phi1)
+    pz_ll = pt0 * np.sinh(eta0) + pt1 * np.sinh(eta1)
+    m_sq  = (e0 + e1) ** 2 - (px_ll ** 2 + py_ll ** 2 + pz_ll ** 2)
+    mll   = np.sqrt(np.clip(m_sq, 0.0, None))
+
+    phi_ll      = np.arctan2(py_ll, px_ll)
+    met_phi_np  = ak.to_numpy(arrays["met_phi"]).astype(np.float64)
+    raw_dphi    = phi_ll - met_phi_np
+    dphi_ll_met = np.abs(np.arctan2(np.sin(raw_dphi), np.cos(raw_dphi)))
+
     cut_inputs: dict[str, np.ndarray] = {
-        "lep_n": ak.to_numpy(arrays["lep_n"]),
-        "jet_n": ak.to_numpy(arrays["jet_n"]),
-        "lead_lep_pt": ak.to_numpy(lep_pt[:, 0]),
-        "sublead_lep_pt": ak.to_numpy(lep_pt[:, 1]),
+        "lep_n":              ak.to_numpy(arrays["lep_n"]),
+        "jet_n":              ak.to_numpy(arrays["jet_n"]),
+        "lead_lep_pt":        pt0,
+        "sublead_lep_pt":     pt1,
         "lep_charge_product": ak.to_numpy(lep_charge[:, 0] * lep_charge[:, 1]),
+        "lep_type_product":   ak.to_numpy(lep_type[:, 0] * lep_type[:, 1]),
+        "met":                ak.to_numpy(arrays["met"]),
+        "mll":                mll,
+        "dphi_ll_met":        dphi_ll_met,
     }
     mask = evaluate_cuts(cut_inputs, cuts)
     arrays = arrays[mask]
