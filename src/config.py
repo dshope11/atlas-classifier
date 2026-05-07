@@ -62,6 +62,9 @@ class TrainingConfig:
 
     # --- Event selection cuts (nested DSL — see src/utils.py:evaluate_cuts) -
     cuts: dict[str, Any] = field(default_factory=dict)
+    # Cut-based baseline applied to test-set features for Asimov Z comparison.
+    # Variable names must match feature names in split.h5 (composite names).
+    baseline_cuts: dict[str, Any] = field(default_factory=dict)
 
     # --- Paths -----------------------------------------------------------
     raw_dir: str = "data/raw"
