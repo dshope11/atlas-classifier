@@ -4,13 +4,14 @@
 # raise an error at load time. Defaults shown match the dataclass — change here
 # rather than in code.
 
-# --- Architecture --------------------------------------------------------
-hidden_sizes: [128, 64, 32]
-dropout: 0.3
+# --- Architecture + training hyperparameters ----------------------------
+# Values below set by Optuna TPE (scripts/tune.py); see logs/tune_loose.log
+hidden_sizes: [128, 64]
+dropout: 0.102
 input_noise_std: 0.01      # GaussianNoise stddev added to inputs (training only)
 
 # --- Training ------------------------------------------------------------
-lr: 0.001
+lr: 0.00869
 epochs: 200
 patience: 15               # early stopping (epochs without val_loss improvement)
 batch_size: 256

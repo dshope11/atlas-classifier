@@ -426,7 +426,7 @@ def run_evaluation(config: TrainingConfig) -> None:
     )
     z_cut = asimov_significance(s_cut, b_cut)
     LOGGER.info(
-        "Cut-based baseline (m_T<125 AND dphi_ll<1.8): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f",
+        "Cut-based baseline (config.baseline_cuts): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f",
         cut_tpr, cut_fpr, s_cut, b_cut, z_cut,
     )
 
