@@ -39,8 +39,11 @@ from src.utils import setup_logging  # noqa: E402
 
 LOGGER = logging.getLogger(Path(__file__).stem)
 
-HIDDEN_CHOICES: list[str] = ["32", "16-16", "64-32", "32-16", "64-32-16", "128-64"]
-BATCH_CHOICES: list[int] = [64, 128, 256]
+HIDDEN_CHOICES: list[str] = [
+    "32", "16-16", "64-32", "32-16", "64-32-16",
+    "128-64", "128-64-32", "256-128-64",
+]
+BATCH_CHOICES: list[int] = [64, 128, 256, 512]
 
 
 def _parse_hidden(s: str) -> list[int]:

@@ -43,7 +43,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.config import TrainingConfig, load_config  # noqa: E402
 from src.model import HWWClassifier  # noqa: E402
 from src.preprocessing import load_split  # noqa: E402
-from src.utils import asimov_significance, chronomat, print_timings, setup_logging  # noqa: E402
+from src.utils import asimov_significance, chronomat, evaluate_cuts, print_timings, setup_logging  # noqa: E402
 
 LOGGER = logging.getLogger(Path(__file__).stem)
 
@@ -353,17 +353,16 @@ def cut_baseline_metrics(
     X_test: np.ndarray, y_test: np.ndarray, w_test: np.ndarray,
     feature_names: list[str],
 ) -> tuple[float, float, float, float]:
-    """Apply the cut-based selection ``m_T < 125 GeV  AND  dphi_ll < 1.8 rad``.
+    """Apply ``config.baseline_cuts`` to the test-set feature matrix.
 
     Returns (TPR, FPR, signal_yield, background_yield).
     """
-    if "m_T" not in feature_names or "dphi_ll" not in feature_names:
+    if not config.baseline_cuts:
         raise RuntimeError(
-            "Cut-based baseline requires 'm_T' and 'dphi_ll' features in the feature set."
+            "config.baseline_cuts is empty — define it in config.yaml under 'baseline_cuts:'"
         )
-    i_mT = feature_names.index("m_T")
-    i_dphi = feature_names.index("dphi_ll")
-    pass_mask = (X_test[:, i_mT] < 125.0) & (X_test[:, i_dphi] < 1.8)
+    events_dict = {name: X_test[:, i] for i, name in enumerate(feature_names)}
+    pass_mask = evaluate_cuts(events_dict, config.baseline_cuts)
     sig_mask = y_test == 1
     bkg_mask = y_test == 0
     n_sig_total = int(sig_mask.sum())

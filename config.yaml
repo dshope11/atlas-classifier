@@ -39,8 +39,17 @@ cuts:
     - ["sublead_lep_pt", "> 15"]       # 15 GeV
     - ["met", "> 20"]                  # 20 GeV — ensures MET direction is well-defined
     - ["mll", "> 10"]                  # 10 GeV — DF preselection, removes low-mass resonances
-    - ["mll", "< 55"]                  # 55 GeV — WW/top suppression; Higgs spin-0 kinematics
-    - ["dphi_ll_met", "> 1.57"]        # > π/2 — MET mismeasurement + Z→ττ suppression
+    # mll < 55 and dphi_ll_met > π/2 removed — let DNN learn these boundaries from data
+
+# --- Cut-based baseline (uses feature names from split.h5) ---------------
+# Applied to test-set feature matrix for Asimov Z comparison in evaluate.py.
+# Matches the Run 2 Legacy 0-jet SR selection (ANA-HIGP-2024-07, Section 6.1).
+baseline_cuts:
+  and:
+    - ["m_ll", "< 55"]             # Higgs spin-0 kinematics + WW/top suppression
+    - ["dphi_ll_met", "> 1.57"]    # > π/2 — MET mismeasurement + Z→ττ suppression
+    - ["m_T", "< 125"]             # primary discriminant: kinematic edge at m_H
+    - ["dphi_ll", "< 2.0"]         # collinear lepton requirement (Run 2 uses 2.0 rad)
 
 # --- Paths (relative to repo root) ---------------------------------------
 raw_dir: "data/raw"
