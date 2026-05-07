@@ -431,14 +431,33 @@ def run_evaluation(config: TrainingConfig) -> None:
         cut_tpr, cut_fpr, s_cut, b_cut, z_cut,
     )
 
-    # --- DNN at working point -----------------------------------------
-    sig_scores_test = scores_test[y_test == 1]
-    threshold = _threshold_at_signal_eff(sig_scores_test, config.working_point_signal_eff)
-    s_dnn, b_dnn = _yields(scores_test, y_test, w_test, threshold)
-    z_dnn = asimov_significance(s_dnn, b_dnn)
+    # --- Threshold scan: optimal Z and cut-TPR match -----------------
+    fpr_vals, tpr_vals, score_thresholds = roc_curve(y_test, scores_test)
+    z_scan = np.array([
+        asimov_significance(*_yields(scores_test, y_test, w_test, float(t)))
+        for t in score_thresholds
+    ])
+
+    opt_idx       = int(np.argmax(z_scan))
+    z_opt         = float(z_scan[opt_idx])
+    tpr_opt       = float(tpr_vals[opt_idx])
+    fpr_opt       = float(fpr_vals[opt_idx])
+    threshold_opt = float(score_thresholds[opt_idx])
+    s_opt, b_opt  = _yields(scores_test, y_test, w_test, threshold_opt)
     LOGGER.info(
-        "DNN @ %.0f%% signal eff (threshold=%.4f): s=%.3f  b=%.3f  Z=%.3f  (gain over cut-based: %+.3f)",
-        100 * config.working_point_signal_eff, threshold, s_dnn, b_dnn, z_dnn, z_dnn - z_cut,
+        "DNN @ optimal threshold (threshold=%.4f): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f  (gain over cut-based: %+.3f)",
+        threshold_opt, tpr_opt, fpr_opt, s_opt, b_opt, z_opt, z_opt - z_cut,
+    )
+
+    cut_match_idx         = int(np.argmin(np.abs(tpr_vals - cut_tpr)))
+    threshold_cut_tpr     = float(score_thresholds[cut_match_idx])
+    tpr_matched           = float(tpr_vals[cut_match_idx])
+    fpr_matched           = float(fpr_vals[cut_match_idx])
+    s_cut_tpr, b_cut_tpr  = _yields(scores_test, y_test, w_test, threshold_cut_tpr)
+    z_cut_tpr             = asimov_significance(s_cut_tpr, b_cut_tpr)
+    LOGGER.info(
+        "DNN @ cut-based TPR (threshold=%.4f): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f  (gain over cut-based: %+.3f)",
+        threshold_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr, z_cut_tpr, z_cut_tpr - z_cut,
     )
 
     # --- ROC + score distributions + KS -------------------------------
@@ -475,8 +494,10 @@ def run_evaluation(config: TrainingConfig) -> None:
                 ks_results["background_ks"], ks_results["background_p"],
                 "OK" if ks_results["background_p"] >= 0.05 else "FLAGGED")
     LOGGER.info("Cut-based  Z:                     %.3f  (s=%.2f  b=%.2f)", z_cut, s_cut, b_cut)
-    LOGGER.info("DNN @ WP   Z:                     %.3f  (s=%.2f  b=%.2f)", z_dnn, s_dnn, b_dnn)
-    LOGGER.info("Δ Z (DNN − cut-based):            %+.3f", z_dnn - z_cut)
+    LOGGER.info("DNN @ opt  Z:                     %.3f  (TPR=%.4f  FPR=%.4f  s=%.2f  b=%.2f)", z_opt, tpr_opt, fpr_opt, s_opt, b_opt)
+    LOGGER.info("Δ Z (opt − cut-based):            %+.3f", z_opt - z_cut)
+    LOGGER.info("DNN @ cut-TPR Z:                  %.3f  (TPR=%.4f  FPR=%.4f  s=%.2f  b=%.2f)", z_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr)
+    LOGGER.info("Δ Z (cut-TPR − cut-based):        %+.3f", z_cut_tpr - z_cut)
     LOGGER.info("Permutation importance (sorted):")
     for name, val in sorted(perm.items(), key=lambda kv: -kv[1]):
         LOGGER.info("    %-15s  %+.4f", name, val)
