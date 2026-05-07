@@ -36,9 +36,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.config import TrainingConfig, load_config  # noqa: E402
 from src.sample_info import SAMPLES, SampleInfo  # noqa: E402
-from src.utils import chronomat, evaluate_cuts, print_timings  # noqa: E402
+from src.utils import chronomat, evaluate_cuts, print_timings, setup_logging  # noqa: E402
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger(Path(__file__).stem)
 
 # ROOT branches needed for both selection and weight computation
 _BRANCHES: list[str] = [
@@ -225,20 +225,9 @@ def load_to_hdf5(config: TrainingConfig) -> None:
     LOGGER.info("Wrote %s (%d events)", output, len(events))
 
 
-def _setup_logging(log_path: str) -> None:
-    """Configure logging to both stdout and ``log_path``."""
-    Path(log_path).parent.mkdir(parents=True, exist_ok=True)
-    fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-    logging.basicConfig(
-        level=logging.INFO,
-        format=fmt,
-        handlers=[logging.FileHandler(log_path), logging.StreamHandler()],
-    )
-
-
 def main() -> int:
     config = load_config("config.yaml")
-    _setup_logging(config.log_path)
+    setup_logging(config.log_path)
     load_to_hdf5(config)
     print_timings(LOGGER)
     return 0

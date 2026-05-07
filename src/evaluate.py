@@ -43,9 +43,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.config import TrainingConfig, load_config  # noqa: E402
 from src.model import HWWClassifier  # noqa: E402
 from src.preprocessing import load_split  # noqa: E402
-from src.utils import asimov_significance, chronomat, print_timings  # noqa: E402
+from src.utils import asimov_significance, chronomat, print_timings, setup_logging  # noqa: E402
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger(Path(__file__).stem)
 
 
 # ---------------------------------------------------------------------------
@@ -486,18 +486,9 @@ def run_evaluation(config: TrainingConfig) -> None:
     LOGGER.info("Plots written to: %s", out_dir)
 
 
-def _setup_logging(log_path: str) -> None:
-    Path(log_path).parent.mkdir(parents=True, exist_ok=True)
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        handlers=[logging.FileHandler(log_path, mode="a"), logging.StreamHandler()],
-    )
-
-
 def main() -> int:
     config = load_config("config.yaml")
-    _setup_logging(config.log_path)
+    setup_logging(config.log_path)
     run_evaluation(config)
     print_timings(LOGGER)
     return 0
