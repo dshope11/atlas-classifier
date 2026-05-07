@@ -44,7 +44,7 @@ def _get_url(dsid: int) -> str:
     # Strip simplecache:: prefix — we manage our own on-disk cache via data/raw
     if url.startswith("simplecache::"):
         url = url[len("simplecache::"):]
-    return url
+    return str(url)
 
 
 def _download(url: str, dest: Path) -> None:

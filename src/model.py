@@ -22,7 +22,7 @@ Forward pass:
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import torch
@@ -99,7 +99,7 @@ class HWWClassifier(nn.Module):
         x = self.normalise(x)
         if self.training and self.input_noise_std > 0.0:
             x = x + torch.randn_like(x) * self.input_noise_std
-        return self.hidden(x)
+        return cast(Tensor, self.hidden(x))
 
     @torch.no_grad()
     def predict_proba(self, x: Tensor) -> Tensor:
