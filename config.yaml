@@ -34,8 +34,13 @@ cuts:
     - ["jet_n", "== 0"]
     - ["lep_n", "== 2"]
     - ["lep_charge_product", "< 0"]    # opposite sign
+    - ["lep_type_product", "== 143"]   # DF only: eμ (11×13=143)
     - ["lead_lep_pt", "> 25"]          # 25 GeV
     - ["sublead_lep_pt", "> 15"]       # 15 GeV
+    - ["met", "> 20"]                  # 20 GeV — ensures MET direction is well-defined
+    - ["mll", "> 10"]                  # 10 GeV — DF preselection, removes low-mass resonances
+    - ["mll", "< 55"]                  # 55 GeV — WW/top suppression; Higgs spin-0 kinematics
+    - ["dphi_ll_met", "> 1.57"]        # > π/2 — MET mismeasurement + Z→ττ suppression
 
 # --- Paths (relative to repo root) ---------------------------------------
 raw_dir: "data/raw"

@@ -117,15 +117,42 @@ def _m_T(events: np.ndarray) -> np.ndarray:
     return np.sqrt(2.0 * ptll * met * (1.0 - np.cos(dphi)))
 
 
+def _pt_lead(events: np.ndarray) -> np.ndarray:
+    return events["lep_pt_lead"].astype(np.float64)
+
+
+def _pt_sublead(events: np.ndarray) -> np.ndarray:
+    return events["lep_pt_sublead"].astype(np.float64)
+
+
+def _met(events: np.ndarray) -> np.ndarray:
+    return events["met"].astype(np.float64)
+
+
+def _eta_lead(events: np.ndarray) -> np.ndarray:
+    return events["lep_eta_lead"].astype(np.float64)
+
+
+def _eta_sublead(events: np.ndarray) -> np.ndarray:
+    return events["lep_eta_sublead"].astype(np.float64)
+
+
 # Feature registry — order is the column order in X. Adding a feature here
 # is the only change needed in code; the model and HDF5 schema adapt to
 # len(FEATURE_FNS) automatically.
 FEATURE_FNS: dict[str, Callable[[np.ndarray], np.ndarray]] = {
-    "m_ll": _m_ll,
-    "pT_ll": _pT_ll,
-    "dphi_ll": _dphi_ll,
+    # Composite variables
+    "m_ll":        _m_ll,
+    "pT_ll":       _pT_ll,
+    "dphi_ll":     _dphi_ll,
     "dphi_ll_met": _dphi_ll_met,
-    "m_T": _m_T,
+    "m_T":         _m_T,
+    # Raw kinematics — motivated by Run 2 H→WW DNN (ANA-HIGP-2024-07)
+    "pt_lead":     _pt_lead,
+    "pt_sublead":  _pt_sublead,
+    "met":         _met,
+    "eta_lead":    _eta_lead,
+    "eta_sublead": _eta_sublead,
 }
 
 FEATURE_NAMES: list[str] = list(FEATURE_FNS.keys())
