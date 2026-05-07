@@ -134,7 +134,7 @@ def _leaf_mask(events: Any, var: str, expr: str) -> np.ndarray:
                     value = int(value)
             except ValueError as err:
                 raise ValueError(f"Cannot parse cut value {value_str!r}") from err
-            return _OPERATORS[op_symbol](events[var], value)
+            return np.asarray(_OPERATORS[op_symbol](events[var], value))
     raise ValueError(f"No operator found in cut expression: {expr!r}")
 
 
@@ -158,10 +158,10 @@ def evaluate_cuts(events: Any, cuts: Any) -> np.ndarray:
     if isinstance(cuts, dict):
         if "and" in cuts:
             sub_masks = [evaluate_cuts(events, sub) for sub in cuts["and"]]
-            return np.logical_and.reduce(sub_masks)
+            return np.asarray(np.logical_and.reduce(sub_masks))
         if "or" in cuts:
             sub_masks = [evaluate_cuts(events, sub) for sub in cuts["or"]]
-            return np.logical_or.reduce(sub_masks)
+            return np.asarray(np.logical_or.reduce(sub_masks))
         raise ValueError(f"Compound cut must contain 'and' or 'or', got: {cuts!r}")
 
     raise TypeError(f"Cuts must be list or dict, got: {type(cuts).__name__}")

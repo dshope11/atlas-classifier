@@ -33,6 +33,7 @@ import logging
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import h5py
 import numpy as np
@@ -54,12 +55,12 @@ LOGGER = logging.getLogger(Path(__file__).stem)
 
 def _wrap_to_pi(angle: np.ndarray) -> np.ndarray:
     """Wrap an angle to [−π, π] (inclusive)."""
-    return np.arctan2(np.sin(angle), np.cos(angle))
+    return cast(np.ndarray, np.arctan2(np.sin(angle), np.cos(angle)))
 
 
 def _abs_dphi(phi_a: np.ndarray, phi_b: np.ndarray) -> np.ndarray:
     """|Δφ| between two angle arrays, in [0, π]."""
-    return np.abs(_wrap_to_pi(phi_a - phi_b))
+    return cast(np.ndarray, np.abs(_wrap_to_pi(phi_a - phi_b)))
 
 
 def _m_ll(events: np.ndarray) -> np.ndarray:
@@ -114,7 +115,7 @@ def _m_T(events: np.ndarray) -> np.ndarray:
     ptll = _pT_ll(events)
     met = events["met"].astype(np.float64)
     dphi = _dphi_ll_met(events)
-    return np.sqrt(2.0 * ptll * met * (1.0 - np.cos(dphi)))
+    return cast(np.ndarray, np.sqrt(2.0 * ptll * met * (1.0 - np.cos(dphi))))
 
 
 def _pt_lead(events: np.ndarray) -> np.ndarray:

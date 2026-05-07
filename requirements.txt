@@ -31,3 +31,5 @@ ruff>=0.4
 mypy>=1.8
 pytest>=8.0
 types-PyYAML>=6.0
+types-requests>=2.31
+types-tqdm>=4.65
