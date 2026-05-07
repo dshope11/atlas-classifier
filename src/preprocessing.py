@@ -42,9 +42,9 @@ from sklearn.model_selection import train_test_split
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.config import Features, Labels, TrainingConfig, Weights, load_config  # noqa: E402
-from src.utils import chronomat, print_timings  # noqa: E402
+from src.utils import chronomat, print_timings, setup_logging  # noqa: E402
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger(Path(__file__).stem)
 
 
 # ---------------------------------------------------------------------------
@@ -264,19 +264,9 @@ def load_split(split_path: str | Path) -> dict[str, np.ndarray | list[str]]:
     return out
 
 
-def _setup_logging(log_path: str) -> None:
-    Path(log_path).parent.mkdir(parents=True, exist_ok=True)
-    fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-    logging.basicConfig(
-        level=logging.INFO,
-        format=fmt,
-        handlers=[logging.FileHandler(log_path), logging.StreamHandler()],
-    )
-
-
 def main() -> int:
     config = load_config("config.yaml")
-    _setup_logging(config.log_path)
+    setup_logging(config.log_path)
     build_and_save_split(config)
     print_timings(LOGGER)
     return 0

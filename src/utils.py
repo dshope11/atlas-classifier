@@ -1,6 +1,8 @@
 """Shared utilities for the atlas-classifier pipeline.
 
-Three small, decoupled helpers used across data loading, training, and evaluation:
+Four small, decoupled helpers used across data loading, training, and evaluation:
+
+- ``setup_logging``: configure root logger to write to both stdout and a log file.
 
 - ``chronomat``: a timing decorator that accumulates wall-clock times per function
   into an ``OrderedDict`` for end-of-run reporting.
@@ -15,14 +17,31 @@ Three small, decoupled helpers used across data loading, training, and evaluatio
 
 from __future__ import annotations
 
+import logging
 import operator
 import time
 from collections import OrderedDict
 from collections.abc import Callable
 from functools import wraps
+from pathlib import Path
 from typing import Any, TypeVar
 
 import numpy as np
+
+
+# ---------------------------------------------------------------------------
+# setup_logging — stdout + file handler on the root logger
+# ---------------------------------------------------------------------------
+
+
+def setup_logging(log_path: str) -> None:
+    """Configure logging to both stdout and ``log_path`` (appended)."""
+    Path(log_path).parent.mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[logging.FileHandler(log_path, mode="a"), logging.StreamHandler()],
+    )
 
 # ---------------------------------------------------------------------------
 # chronomat — wall-clock timing decorator
