@@ -49,7 +49,7 @@ class TrainingConfig:
     epochs: int = 200
     patience: int = 15  # early stopping patience (epochs without val_loss improvement)
     batch_size: int = 256
-    working_point_signal_eff: float = 0.30  # threshold for per-epoch significance
+    working_point_signal_eff: float = 0.30  # per-epoch val Z diagnostic during training only; not used in evaluate.py
 
     # --- Data ------------------------------------------------------------
     lumi: float = 36.1  # fb⁻¹ — see notes/data_sources.md for choice rationale

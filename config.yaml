@@ -14,7 +14,7 @@ lr: 0.001
 epochs: 200
 patience: 15               # early stopping (epochs without val_loss improvement)
 batch_size: 256
-working_point_signal_eff: 0.30   # threshold for per-epoch significance diagnostic
+working_point_signal_eff: 0.30   # per-epoch val Z diagnostic during training only; not used in evaluate.py
 
 # --- Data ----------------------------------------------------------------
 lumi: 36.1                 # fb^-1 — see notes/data_sources.md for choice
