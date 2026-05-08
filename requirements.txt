@@ -20,10 +20,10 @@ seaborn>=0.13
 pyyaml>=6.0
 tqdm>=4.65
 
-# Optional: hyperparameter optimisation (Stage: scripts/tune.py)
+# Hyperparameter optimisation
 optuna>=3.5
 
-# Optional: BDT comparison (Stage: src/bdt.py)
+# BDT comparison
 xgboost>=2.0
 
 # Dev tooling (linting + tests run via .claude/settings.json post-edit hook)
