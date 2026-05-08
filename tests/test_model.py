@@ -1,4 +1,4 @@
-"""Tests for src.model — forward pass shapes, logit semantics, loss numerics."""
+"""Tests for src.model - forward pass shapes, logit semantics, loss numerics."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ def model() -> HWWClassifier:
 
 
 # ---------------------------------------------------------------------------
-# Forward pass — shape, dtype, semantics
+# Forward pass - shape, dtype, semantics
 # ---------------------------------------------------------------------------
 
 
@@ -40,7 +40,7 @@ def test_forward_returns_raw_logits_not_bounded_to_unit(model: HWWClassifier) ->
     with torch.no_grad():
         out_large = model(x_large)
         out_small = model(x_small)
-    # At least one batch should have values outside [0, 1] — confirms no implicit sigmoid
+    # At least one batch should have values outside [0, 1] - confirms no implicit sigmoid
     assert (out_large.abs() > 1).any() or (out_small.abs() > 1).any()
 
 
@@ -66,7 +66,7 @@ def test_predict_proba_returns_unit_interval(model: HWWClassifier) -> None:
 
 
 def test_register_buffer_normalisation(model: HWWClassifier) -> None:
-    """``normalise(x)`` should produce (x − median) / IQR using the registered buffers."""
+    """``normalise(x)`` should produce (x - median) / IQR using the registered buffers."""
     x = torch.tensor([[1.0, 2.0, 3.0]])  # exactly the median
     normed = model.normalise(x)
     np.testing.assert_allclose(normed.numpy(), [[0.0, 0.0, 0.0]], atol=1e-7)

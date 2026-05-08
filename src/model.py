@@ -1,4 +1,4 @@
-"""HWWClassifier — PyTorch DNN for binary signal/background classification.
+"""HWWClassifier - PyTorch DNN for binary signal/background classification.
 
 The model is fully self-contained: feature names, normalisation statistics,
 architecture, and weights all live inside the checkpoint. At inference time
@@ -6,15 +6,15 @@ no external config or scaler file is needed.
 
 Forward pass:
 
-1. **InputNorm** — ``(x − median) / iqr`` via two ``register_buffer``
+1. **InputNorm** - ``(x - median) / iqr`` via two ``register_buffer``
    tensors (``input_median``, ``input_iqr``). Buffers move with the
    model on ``.to(device)`` and are saved automatically in the
    ``state_dict``.
-2. **GaussianNoise** — adds ``N(0, σ)`` to the inputs during training
+2. **GaussianNoise** - adds ``N(0, sigma)`` to the inputs during training
    only. Acts as a small input regulariser.
-3. **Hidden layers** — repeating ``Linear → BatchNorm1d → ReLU →
+3. **Hidden layers** - repeating ``Linear -> BatchNorm1d -> ReLU ->
    Dropout`` block, sized per ``config.hidden_sizes``.
-4. **Output** — single linear projection to a raw logit. No sigmoid;
+4. **Output** - single linear projection to a raw logit. No sigmoid;
    ``BCEWithLogitsLoss`` applies it internally during training, and
    ``torch.sigmoid`` is applied explicitly at inference.
 """
@@ -30,7 +30,7 @@ from torch import Tensor, nn
 
 from src.config import TrainingConfig
 
-# Anything torch.as_tensor accepts — sequences, ndarrays, tensors. Kept loose
+# Anything torch.as_tensor accepts - sequences, ndarrays, tensors. Kept loose
 # on purpose so callers (preprocessing, train) can pass np arrays directly.
 ScalerStats = Sequence[float] | Tensor | np.ndarray
 
@@ -79,7 +79,7 @@ class HWWClassifier(nn.Module):
         layers.append(nn.Linear(in_dim, 1))
         self.hidden = nn.Sequential(*layers)
 
-        # Kaiming init for ReLU — torch default is Kaiming uniform; we use
+        # Kaiming init for ReLU - torch default is Kaiming uniform; we use
         # Kaiming normal explicitly for reproducibility regardless of pytorch version
         for m in self.hidden.modules():
             if isinstance(m, nn.Linear):
@@ -156,7 +156,7 @@ class HWWClassifier(nn.Module):
             cuts=config.cuts,
         )
         feature_names = list(ckpt["feature_names"])
-        # Buffers in state_dict carry the median/IQR — but the constructor
+        # Buffers in state_dict carry the median/IQR - but the constructor
         # also requires explicit values. Read them from the state_dict.
         median = ckpt["state_dict"]["input_median"].squeeze().tolist()
         iqr = ckpt["state_dict"]["input_iqr"].squeeze().tolist()

@@ -1,4 +1,4 @@
-"""Tests for src.preprocessing — feature math, split correctness, scaler stats."""
+"""Tests for src.preprocessing - feature math, split correctness, scaler stats."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from src.preprocessing import (
 
 
 # ---------------------------------------------------------------------------
-# Δφ wrapping
+# dphi wrapping
 # ---------------------------------------------------------------------------
 
 
@@ -41,7 +41,7 @@ def test_wrap_to_pi_wraps_below() -> None:
 
 
 def test_abs_dphi_in_zero_pi() -> None:
-    """|Δφ| must always be in [0, π], never larger."""
+    """|dphi| must always be in [0, pi], never larger."""
     rng = np.random.default_rng(0)
     a = rng.uniform(-10, 10, size=1000)
     b = rng.uniform(-10, 10, size=1000)
@@ -59,7 +59,7 @@ def test_abs_dphi_back_to_back_is_pi() -> None:
 
 
 # ---------------------------------------------------------------------------
-# m_T formula — manual calculation
+# m_T formula - manual calculation
 # ---------------------------------------------------------------------------
 
 
@@ -89,17 +89,17 @@ def test_mT_collinear_dilepton_and_met_zero() -> None:
 
 
 def test_mT_back_to_back_dilepton_and_met_max() -> None:
-    """When dphi(ll, MET) = π, m_T = sqrt(2 · pT_ll · MET · 2) = 2 √(pT_ll · MET)."""
+    """When dphi(ll, MET) = pi, m_T = sqrt(2 * pT_ll * MET * 2) = 2 * sqrt(pT_ll * MET)."""
     pt1, pt2, met = 60.0, 40.0, 50.0
     events = _events_for_mT(pt1=pt1, pt2=pt2, met=met, met_phi=np.pi)
-    pt_ll = pt1 + pt2  # both leptons at phi=0 → vector sum = scalar sum
+    pt_ll = pt1 + pt2  # both leptons at phi=0 -> vector sum = scalar sum
     expected = np.sqrt(2 * pt_ll * met * 2)
     mt = _m_T(events)
     np.testing.assert_allclose(mt, [expected], atol=1e-5)
 
 
 # ---------------------------------------------------------------------------
-# Stratified split + scaler stats — end-to-end on a synthetic events.h5
+# Stratified split + scaler stats - end-to-end on a synthetic events.h5
 # ---------------------------------------------------------------------------
 
 
@@ -184,7 +184,7 @@ def test_build_and_save_split_stratification(fake_events_h5: Path, tmp_path: Pat
 
 
 def test_load_split_returns_raw_unnormalised_features(fake_events_h5: Path, tmp_path: Path) -> None:
-    """X arrays returned by load_split should NOT be standardised — model handles that."""
+    """X arrays returned by load_split should NOT be standardised - model handles that."""
     config = TrainingConfig(
         processed_path=str(fake_events_h5),
         split_path=str(tmp_path / "split.h5"),
@@ -193,8 +193,8 @@ def test_load_split_returns_raw_unnormalised_features(fake_events_h5: Path, tmp_
     build_and_save_split(config)
     split = load_split(config.split_path)
     X_train = _arr(split, "X_train")
-    # If we'd normalised, mean would be ≈ 0. Raw features are well away from 0.
-    assert abs(X_train.mean()) > 1.0, "Features look normalised — they should be raw"
+    # If we'd normalised, mean would be ~= 0. Raw features are well away from 0.
+    assert abs(X_train.mean()) > 1.0, "Features look normalised - they should be raw"
 
 
 def test_scaler_stats_train_only(fake_events_h5: Path, tmp_path: Path) -> None:
@@ -208,7 +208,7 @@ def test_scaler_stats_train_only(fake_events_h5: Path, tmp_path: Path) -> None:
     split = load_split(config.split_path)
     median = _arr(split, "scaler_median")
     iqr = _arr(split, "scaler_iqr")
-    # Recompute from train slice — must match exactly
+    # Recompute from train slice - must match exactly
     expected_median, expected_iqr = compute_scaler_stats(_arr(split, "X_train"))
     np.testing.assert_allclose(median, expected_median, rtol=1e-12)
     np.testing.assert_allclose(iqr, expected_iqr, rtol=1e-12)

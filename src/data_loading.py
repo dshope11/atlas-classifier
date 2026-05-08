@@ -1,14 +1,14 @@
-"""ROOT → HDF5 data loading for the H→WW→2lνν 0-jet analysis.
+"""ROOT -> HDF5 data loading for the H->WW->2lnunu 0-jet analysis.
 
 For each sample registered in :mod:`src.sample_info`:
 
 1. Read needed branches from the local ROOT file via ``uproot``, batched by
    ``uproot.TTree.iterate`` so the 1.9 GB ttbar file does not blow memory.
 2. Filter to events with exactly two leptons (otherwise lep[:, 0/1] indexing
-   would be unsafe — the ``2to4lep`` skim guarantees ≥2 but allows up to 4).
+   would be unsafe - the ``2to4lep`` skim guarantees >= 2 but allows up to 4).
 3. Compute the pre-cut scalars needed by the cut DSL:
    ``lead_lep_pt``, ``sublead_lep_pt``, ``lep_charge_product``,
-   ``lep_type_product`` (143 for eμ), ``met``, ``mll``, ``dphi_ll_met``.
+   ``lep_type_product`` (143 for emu), ``met``, ``mll``, ``dphi_ll_met``.
 4. Apply event-selection cuts via :func:`src.utils.evaluate_cuts` against the
    ``cuts`` block in ``config.yaml``.
 5. Compute the per-event physics weight using the canonical 2025-release
@@ -52,7 +52,7 @@ _BRANCHES: list[str] = [
     "xsec", "filteff", "kfac", "sum_of_weights",
 ]
 
-# Output schema — one structured-array record per surviving event
+# Output schema - one structured-array record per surviving event
 OUTPUT_DTYPE: np.dtype = np.dtype([
     ("lep_pt_lead",        "f4"),
     ("lep_pt_sublead",     "f4"),
@@ -104,7 +104,7 @@ def _process_chunk(
     e0   = ak.to_numpy(arrays["lep_e"][:, 0]).astype(np.float64)
     e1   = ak.to_numpy(arrays["lep_e"][:, 1]).astype(np.float64)
 
-    # Dilepton system — shared intermediates for mll and dphi_ll_met
+    # Dilepton system - shared intermediates for mll and dphi_ll_met
     px_ll = pt0 * np.cos(phi0) + pt1 * np.cos(phi1)
     py_ll = pt0 * np.sin(phi0) + pt1 * np.sin(phi1)
     pz_ll = pt0 * np.sinh(eta0) + pt1 * np.sinh(eta1)
@@ -132,7 +132,7 @@ def _process_chunk(
     if len(arrays) == 0:
         return np.zeros(0, dtype=OUTPUT_DTYPE)
 
-    # Per-event physics weight — see notes/data_sources.md for derivation.
+    # Per-event physics weight - see notes/data_sources.md for derivation.
     # source: 2025 ATLAS Open Data ttbar_analysis.ipynb (calc_weight)
     # generalised from single-lepton (El/Mu trigger split) to 2-lepton
     # (LepTRIGGER) by multiplying both flavour SFs (1.0 for absent flavour).
@@ -145,7 +145,7 @@ def _process_chunk(
     sf_ele = ak.to_numpy(arrays["ScaleFactor_ELE"])
     sf_muon = ak.to_numpy(arrays["ScaleFactor_MUON"])
     sf_trig = ak.to_numpy(arrays["ScaleFactor_LepTRIGGER"])
-    # lumi is in fb⁻¹; ntuple xsec is in pb → multiply lumi by 1000
+    # lumi is in fb^-1; ntuple xsec is in pb -> multiply lumi by 1000
     event_weight = (
         (lumi * 1000.0 * xsec * kfac * filteff / sumw)
         * mcweight
@@ -225,7 +225,7 @@ def load_to_hdf5(config: TrainingConfig) -> None:
     )
     if n_sig == 0 or n_bkg == 0:
         raise RuntimeError(
-            f"Empty class after selection — n_signal={n_sig}, n_background={n_bkg}. "
+            f"Empty class after selection - n_signal={n_sig}, n_background={n_bkg}. "
             "Check cuts in config.yaml."
         )
 
@@ -235,7 +235,7 @@ def load_to_hdf5(config: TrainingConfig) -> None:
         f.attrs["n_signal"] = n_sig
         f.attrs["n_background"] = n_bkg
 
-    # Validate output — catch silent write failures
+    # Validate output - catch silent write failures
     with h5py.File(output, "r") as f:
         if "events" not in f:
             raise RuntimeError(f"Output validation failed: 'events' missing in {output}")

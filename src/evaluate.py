@@ -3,17 +3,17 @@
 Outputs (all written under ``config.output_dir`` as PNGs + a printed summary):
 
 **Pre-fit diagnostics** (from the split, before model is touched):
-- ``features_signal_vs_background.png`` — overlaid normalised distributions
-- ``feature_correlation.png`` — heatmap, computed on signal events
+- ``features_signal_vs_background.png`` - overlaid normalised distributions
+- ``feature_correlation.png`` - heatmap, computed on signal events
 
 **Post-fit**:
-- ``training_curves.png`` — twin-axis: val loss (left) + val Asimov Z (right)
-- ``roc.png`` — ROC + AUC with Clopper–Pearson 1σ bands and the cut-based
+- ``training_curves.png`` - twin-axis: val loss (left) + val Asimov Z (right)
+- ``roc.png`` - ROC + AUC with Clopper-Pearson 1sigma bands and the cut-based
   working point as a single marker
-- ``score_distributions.png`` — signal vs background, train/test overlaid,
+- ``score_distributions.png`` - signal vs background, train/test overlaid,
   weighted by physics ``event_weight``
-- ``feature_importance.png`` — permutation (global) and perturbation (local
-  ±0.01σ) side by side; disagreement is interpretable
+- ``feature_importance.png`` - permutation (global) and perturbation (local
+  +/-0.01sigma) side by side; disagreement is interpretable
 
 **Printed summary**: AUC, KS overtraining check (p-values), cut-based and DNN
 Asimov significance at the working point.
@@ -172,7 +172,7 @@ def plot_roc_with_bands(
     cut_baseline_tpr: float,
     out_path: Path,
 ) -> tuple[float, np.ndarray, np.ndarray, np.ndarray]:
-    """ROC + AUC + Clopper–Pearson 1σ bands + cut-based working-point marker."""
+    """ROC + AUC + Clopper-Pearson 1sigma bands + cut-based working-point marker."""
     fpr, tpr, _ = roc_curve(y_test, scores_test)
     roc_auc = auc(fpr, tpr)
 
@@ -185,7 +185,7 @@ def plot_roc_with_bands(
 
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.plot(fpr, tpr, "C0-", label=f"DNN (AUC = {roc_auc:.3f})", linewidth=1.5)
-    ax.fill_between(fpr, tpr_lo, tpr_hi, color="C0", alpha=0.20, label=r"DNN $\pm 1\sigma$ (Clopper–Pearson)")
+    ax.fill_between(fpr, tpr_lo, tpr_hi, color="C0", alpha=0.20, label=r"DNN $\pm 1\sigma$ (Clopper-Pearson)")
     ax.fill_betweenx(tpr, fpr_lo, fpr_hi, color="C0", alpha=0.10)
     ax.plot([0, 1], [0, 1], "k--", alpha=0.4, label="random")
     ax.plot(
@@ -284,7 +284,7 @@ def permutation_importance(
 def perturbation_importance(
     model: HWWClassifier, X: np.ndarray, feature_names: list[str], shift_sigma: float = 0.01
 ) -> dict[str, float]:
-    """Per-feature mean |Δscore| after shifting that feature by ``shift_sigma * std`` per event.
+    """Per-feature mean |delta score| after shifting that feature by ``shift_sigma * std`` per event.
 
     Local gradient sensitivity. Different from permutation importance:
     permutation captures global / correlation-aware reliance; perturbation captures
@@ -347,7 +347,7 @@ def cut_baseline_metrics(
     """
     if not config.baseline_cuts:
         raise RuntimeError(
-            "config.baseline_cuts is empty — define it in config.yaml under 'baseline_cuts:'"
+            "config.baseline_cuts is empty - define it in config.yaml under 'baseline_cuts:'"
         )
     events_dict = {name: X_test[:, i] for i, name in enumerate(feature_names)}
     pass_mask = evaluate_cuts(events_dict, config.baseline_cuts)
@@ -507,9 +507,9 @@ def run_evaluation(config: TrainingConfig) -> None:
                 "OK" if ks_results["background_p"] >= 0.05 else "FLAGGED")
     LOGGER.info("Cut-based  Z:                     %.3f  (s=%.2f  b=%.2f)", z_cut, s_cut, b_cut)
     LOGGER.info("DNN @ opt  Z:                     %.3f  (TPR=%.4f  FPR=%.4f  s=%.2f  b=%.2f)", z_opt, tpr_opt, fpr_opt, s_opt, b_opt)
-    LOGGER.info("Δ Z (opt − cut-based):            %+.3f", z_opt - z_cut)
+    LOGGER.info("dZ (opt - cut-based):            %+.3f", z_opt - z_cut)
     LOGGER.info("DNN @ cut-TPR Z:                  %.3f  (TPR=%.4f  FPR=%.4f  s=%.2f  b=%.2f)", z_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr)
-    LOGGER.info("Δ Z (cut-TPR − cut-based):        %+.3f", z_cut_tpr - z_cut)
+    LOGGER.info("dZ (cut-TPR - cut-based):        %+.3f", z_cut_tpr - z_cut)
     LOGGER.info("Permutation importance (sorted):")
     for name, val in sorted(perm.items(), key=lambda kv: -kv[1]):
         LOGGER.info("    %-15s  %+.4f", name, val)

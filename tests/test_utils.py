@@ -1,4 +1,4 @@
-"""Tests for src.utils — asimov_significance, compute_yields, clopper_pearson, evaluate_cuts."""
+"""Tests for src.utils - asimov_significance, compute_yields, clopper_pearson, evaluate_cuts."""
 
 from __future__ import annotations
 
@@ -19,14 +19,14 @@ def test_asimov_returns_zero_when_no_background() -> None:
 
 
 def test_asimov_reduces_to_s_over_sqrtb_when_s_small() -> None:
-    """In the s ≪ b limit, Z → s/√b. Exact for s = 0."""
+    """In the s << b limit, Z -> s/sqrt(b). Exact for s = 0."""
     s, b = 1.0, 1000.0
     z = asimov_significance(s, b)
     np.testing.assert_allclose(z, s / np.sqrt(b), rtol=2e-3)
 
 
 def test_asimov_above_s_over_sqrtb_when_s_comparable_to_b() -> None:
-    """When s ~ b, the Asimov formula is more conservative than S/√B."""
+    """When s ~ b, the Asimov formula is more conservative than S/sqrt(B)."""
     s, b = 50.0, 100.0
     z_asimov = asimov_significance(s, b)
     z_naive = s / np.sqrt(b)
@@ -36,7 +36,7 @@ def test_asimov_above_s_over_sqrtb_when_s_comparable_to_b() -> None:
 
 
 def test_asimov_monotonic_in_signal() -> None:
-    """More signal → higher significance (b held fixed)."""
+    """More signal -> higher significance (b held fixed)."""
     b = 100.0
     zs = [asimov_significance(s, b) for s in [1, 5, 10, 20, 50]]
     assert all(zs[i] < zs[i + 1] for i in range(len(zs) - 1))
@@ -100,7 +100,7 @@ def test_clopper_pearson_central_interval_contains_true_rate() -> None:
     """For k/n = 0.5, the 1-sigma interval should contain 0.5 and be plausibly narrow."""
     lo, hi = clopper_pearson(np.array([50]), np.array([100]))
     assert lo[0] < 0.5 < hi[0]
-    assert (hi[0] - lo[0]) < 0.15  # 68% CI on 100 trials is ~±5%
+    assert (hi[0] - lo[0]) < 0.15  # 68% CI on 100 trials is ~+/-5%
 
 
 # ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ def test_evaluate_cuts_or(events: dict[str, np.ndarray]) -> None:
 
 
 def test_evaluate_cuts_nested(events: dict[str, np.ndarray]) -> None:
-    """and(or(...), leaf) — exercises recursion."""
+    """and(or(...), leaf) - exercises recursion."""
     cuts = {"and": [{"or": [["x", "< 2"], ["x", ">= 5"]]}, ["flag", "== 1"]]}
     mask = evaluate_cuts(events, cuts)
     np.testing.assert_array_equal(mask, [False, False, False, False, False, True])
