@@ -37,23 +37,27 @@ atlas-classifier/
   src/
     config.py            ← TrainingConfig dataclass + YAML loader, type aliases
     sample_info.py       ← SAMPLES registry (DSIDs + is_signal labels)
-    utils.py             ← asimov_significance, evaluate_cuts (cut DSL), chronomat
+    utils.py             ← asimov_significance, compute_yields, clopper_pearson,
+                            evaluate_cuts (cut DSL), chronomat, setup_logging
     data_loading.py      ← uproot + awkward → HDF5 with selection + weights
-    preprocessing.py     ← feature engineering, normalization, 3-way split
+    preprocessing.py     ← feature engineering (10 features), normalization, 3-way split
     model.py             ← HWWClassifier (in-model RobustScaler, raw-logit output)
     train.py             ← manual training loop
-    evaluate.py          ← full evaluation suite
+    evaluate.py          ← full evaluation suite + threshold scan
   scripts/
     download_data.py     ← atlasopenmagic-driven ROOT file download
+    tune.py              ← Optuna TPE hyperparameter search
+    xgboost_compare.py   ← XGBoost benchmark with separate HPO
     inspect_h5.py        ← quick HDF5 structure dump
   tests/
     test_preprocessing.py
     test_model.py
     test_utils.py
+  assets/           ← evaluation plots committed for README embedding
   data/
     raw/            ← ROOT files (gitignored)
     processed/      ← HDF5 + checkpoint + plots (gitignored)
-  logs/             ← training.log (appended)
+  logs/             ← training.log, tune.log, xgboost_compare.log (appended)
   requirements.txt
   CLAUDE.md
 ```
@@ -77,23 +81,32 @@ atlas-classifier/
    - Output: flat structured HDF5 array; composite features NOT stored here
 
 2. Preprocess (src/preprocessing.py → data/processed/split.h5)
-   - Compute 5 composite features: m_ll, pT_ll, dphi_ll, dphi_ll_met, m_T
+   - Compute 10 features: 5 composite (m_ll, pT_ll, dphi_ll, dphi_ll_met, m_T) +
+     5 raw (lep_pt_lead, lep_pt_sublead, met, lep_eta_lead, lep_eta_sublead)
    - 70/15/15 stratified split (train/val/test) — stratified on is_signal
    - RobustScaler stats (median, IQR) from train split only → saved in checkpoint
    - Output: split.h5 with raw (un-normalised) X/y/w per split + scaler stats
 
+2a. (Optional) Tune (scripts/tune.py)
+   - Optuna TPE search over hidden_sizes / dropout / lr / batch_size
+   - Best trial's checkpoint promoted in place; best params logged for config.yaml
+
 3. Train (src/train.py → data/processed/best_model.pt + loss_history.json)
    - BCEWithLogitsLoss with pos_weight=n_bg/n_sig (counts-based class balance)
    - Adam + ReduceLROnPlateau + early stopping on val loss (patience=15)
-   - Per-epoch Asimov Z diagnostic on val set at 30% signal efficiency WP
+   - Per-epoch Asimov Z diagnostic on val set at 30% signal efficiency WP (monitoring only)
    - Saves best checkpoint (lowest val loss) — self-describing, no external sidecar
 
 4. Evaluate (src/evaluate.py → data/processed/eval/)
-   - Cut-based baseline: m_T < 125 GeV AND dphi_ll < 1.8 rad → Asimov Z "before ML"
+   - Cut-based baseline: 4-cut selection (mll<55, dphi_ll_met>π/2, m_T<125, dphi_ll<2.0)
+   - Threshold scan: reports Asimov Z at optimal threshold AND at cut-based TPR
    - ROC + AUC with Clopper–Pearson 1σ bands; cut WP overlaid as marker
    - Score distributions: signal vs background, train/test overlaid, KS stat annotated
    - Feature importance: permutation (global AUC drop) + perturbation (local ±0.01σ)
    - Training curves: twin-axis val loss + val Asimov Z per epoch
+
+4a. (Optional) XGBoost benchmark (scripts/xgboost_compare.py)
+   - Same split and features; separate Optuna HPO; produces roc_comparison.png
 ```
 
 ---
@@ -130,13 +143,10 @@ Composite variables must be computed — they are not stored in the ntuples.
 5. Feature ranking — permutation importance (global AUC drop after shuffling) AND
    perturbation importance (local mean |Δscore| at ±0.01σ shift) — side-by-side bar chart
 
-**Expected result:** Δφ_ll should rank highly — it is the primary discriminant between
-signal (Higgs spin-0 → collinear leptons, small Δφ_ll) and WW background (back-to-back
-leptons, large Δφ_ll). If Δφ_ll does not rank near the top, investigate.
-
-**Reference (ATLAS-restricted, for documentation only):**
-Run 3 VH(WW) NRML Workshop 2025 slides:
-https://indico.cern.ch/event/1498256/contributions/6454020/attachments/3056092/5403155/NRML%20Workshop%202025%20--%20Intro+3L.pdf
+**Expected result:** m_ll dominates (~15× larger permutation importance than the next
+feature). Physical reason: spin-0 Higgs → collinear leptons → simultaneously small Δφ_ll
+and small m_ll; once m_ll is in the network, Δφ_ll adds little marginal information.
+dphi_ll_met and m_T should rank second/third.
 
 **Neyman-Pearson note:** A well-trained binary classifier approximates the likelihood ratio
 L(signal|x)/L(background|x), which is the theoretically optimal test statistic by the
