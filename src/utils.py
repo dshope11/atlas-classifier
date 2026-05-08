@@ -1,6 +1,6 @@
 """Shared utilities for the atlas-classifier pipeline.
 
-Four small, decoupled helpers used across data loading, training, and evaluation:
+Six small, decoupled helpers used across data loading, training, and evaluation:
 
 - ``setup_logging``: configure root logger to write to both stdout and a log file.
 
@@ -8,8 +8,13 @@ Four small, decoupled helpers used across data loading, training, and evaluation
   into an ``OrderedDict`` for end-of-run reporting.
 
 - ``asimov_significance``: discovery significance using Cowan et al. 2011, Eq. 97.
-  Reduces to S/√B in the s ≪ b limit. Used in evaluate.py for both the cut-based
-  baseline and the DNN working-point comparison.
+  Reduces to S/√B in the s ≪ b limit. Used for both the cut-based baseline and
+  the working-point comparison.
+
+- ``compute_yields``: sum of physics weights passing a score threshold, split by
+  signal and background label.
+
+- ``clopper_pearson``: 1σ Clopper–Pearson binomial confidence interval.
 
 - ``evaluate_cuts``: a recursive boolean evaluator for a small YAML cut DSL
   (``{"and": [["var", "> X"], {"or": [...]}]}``).
@@ -27,6 +32,7 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 import numpy as np
+from scipy.stats import beta as _beta_dist
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +108,39 @@ def asimov_significance(s: float, b: float) -> float:
     if b <= 0:
         return 0.0
     return float(np.sqrt(2.0 * ((s + b) * np.log(1.0 + s / b) - s)))
+
+
+# ---------------------------------------------------------------------------
+# compute_yields — weighted signal/background yields above a score threshold
+# ---------------------------------------------------------------------------
+
+
+def compute_yields(
+    scores: np.ndarray, y: np.ndarray, w: np.ndarray, threshold: float
+) -> tuple[float, float]:
+    """Sum of physics weights for signal/background events with score >= threshold."""
+    pass_mask = scores >= threshold
+    s = float(w[pass_mask & (y == 1)].sum())
+    b = float(w[pass_mask & (y == 0)].sum())
+    return s, b
+
+
+# ---------------------------------------------------------------------------
+# clopper_pearson — 1σ Clopper–Pearson binomial confidence interval
+# ---------------------------------------------------------------------------
+
+
+def clopper_pearson(
+    k: np.ndarray, n: np.ndarray, alpha: float = 0.3173
+) -> tuple[np.ndarray, np.ndarray]:
+    """Clopper–Pearson 1σ binomial confidence interval for k successes in n trials.
+
+    alpha = 1 − 0.6827 ≈ 0.3173 → returns the (lo, hi) bounds bracketing the
+    central 68.27% of the distribution (one Gaussian σ).
+    """
+    lo = np.where(k == 0, 0.0, _beta_dist.ppf(alpha / 2, k, n - k + 1))
+    hi = np.where(k == n, 1.0, _beta_dist.ppf(1 - alpha / 2, k + 1, n - k))
+    return np.nan_to_num(lo, nan=0.0), np.nan_to_num(hi, nan=1.0)
 
 
 # ---------------------------------------------------------------------------

@@ -34,7 +34,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import torch
-from scipy.stats import beta, ks_2samp
+from scipy.stats import ks_2samp
 from sklearn.metrics import auc, roc_curve
 
 # Make src.* importable when this module is run as a script
@@ -43,7 +43,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.config import TrainingConfig, load_config  # noqa: E402
 from src.model import HWWClassifier  # noqa: E402
 from src.preprocessing import load_split  # noqa: E402
-from src.utils import asimov_significance, chronomat, evaluate_cuts, print_timings, setup_logging  # noqa: E402
+from src.utils import (  # noqa: E402
+    asimov_significance,
+    chronomat,
+    clopper_pearson,
+    compute_yields,
+    evaluate_cuts,
+    print_timings,
+    setup_logging,
+)
 
 LOGGER = logging.getLogger(Path(__file__).stem)
 
@@ -53,8 +61,8 @@ LOGGER = logging.getLogger(Path(__file__).stem)
 # ---------------------------------------------------------------------------
 
 
-def _score(model: HWWClassifier, X: np.ndarray, batch_size: int = 4096) -> np.ndarray:
-    """Return p(signal) for every row of ``X`` in eval mode."""
+def score_dnn(model: HWWClassifier, X: np.ndarray, batch_size: int = 4096) -> np.ndarray:
+    """Return p(signal) for every row of ``X`` in eval mode (PyTorch / HWWClassifier)."""
     model.eval()
     out: list[np.ndarray] = []
     with torch.no_grad():
@@ -68,14 +76,6 @@ def _score(model: HWWClassifier, X: np.ndarray, batch_size: int = 4096) -> np.nd
 def _threshold_at_signal_eff(scores_signal: np.ndarray, eff: float) -> float:
     """Score threshold giving ``eff`` fraction of signal events above it (unweighted)."""
     return float(np.quantile(scores_signal, 1.0 - eff))
-
-
-def _yields(scores: np.ndarray, y: np.ndarray, w: np.ndarray, threshold: float) -> tuple[float, float]:
-    """Sum of physics weights for signal/background events with score >= threshold."""
-    pass_mask = scores >= threshold
-    s = float(w[pass_mask & (y == 1)].sum())
-    b = float(w[pass_mask & (y == 0)].sum())
-    return s, b
 
 
 # ---------------------------------------------------------------------------
@@ -165,17 +165,6 @@ def plot_training_curves(history_path: Path, out_path: Path) -> None:
     plt.close(fig)
 
 
-def _clopper_pearson(k: np.ndarray, n: np.ndarray, alpha: float = 0.3173) -> tuple[np.ndarray, np.ndarray]:
-    """Clopper–Pearson 1σ binomial confidence interval for k successes in n trials.
-
-    alpha = 1 − 0.6827 ≈ 0.3173 → returns the (lo, hi) bounds bracketing the
-    central 68.27% of the distribution (one Gaussian σ).
-    """
-    lo = np.where(k == 0, 0.0, beta.ppf(alpha / 2, k, n - k + 1))
-    hi = np.where(k == n, 1.0, beta.ppf(1 - alpha / 2, k + 1, n - k))
-    return np.nan_to_num(lo, nan=0.0), np.nan_to_num(hi, nan=1.0)
-
-
 def plot_roc_with_bands(
     scores_test: np.ndarray,
     y_test: np.ndarray,
@@ -191,8 +180,8 @@ def plot_roc_with_bands(
     n_bkg = int((y_test == 0).sum())
     tp = tpr * n_sig
     fp = fpr * n_bkg
-    tpr_lo, tpr_hi = _clopper_pearson(tp, np.full_like(tp, n_sig, dtype=float))
-    fpr_lo, fpr_hi = _clopper_pearson(fp, np.full_like(fp, n_bkg, dtype=float))
+    tpr_lo, tpr_hi = clopper_pearson(tp, np.full_like(tp, n_sig, dtype=float))
+    fpr_lo, fpr_hi = clopper_pearson(fp, np.full_like(fp, n_bkg, dtype=float))
 
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.plot(fpr, tpr, "C0-", label=f"DNN (AUC = {roc_auc:.3f})", linewidth=1.5)
@@ -280,13 +269,13 @@ def permutation_importance(
     model: HWWClassifier, X: np.ndarray, y: np.ndarray, feature_names: list[str], rng: np.random.Generator
 ) -> dict[str, float]:
     """Per-feature AUC drop after shuffling that feature's values across the test set."""
-    base_scores = _score(model, X)
+    base_scores = score_dnn(model, X)
     base_auc = float(auc(*roc_curve(y, base_scores)[:2]))
     drops: dict[str, float] = {}
     for i, name in enumerate(feature_names):
         X_shuf = X.copy()
         X_shuf[:, i] = rng.permutation(X_shuf[:, i])
-        scores = _score(model, X_shuf)
+        scores = score_dnn(model, X_shuf)
         shuf_auc = float(auc(*roc_curve(y, scores)[:2]))
         drops[name] = base_auc - shuf_auc
     return drops
@@ -301,7 +290,7 @@ def perturbation_importance(
     permutation captures global / correlation-aware reliance; perturbation captures
     local responsiveness. Disagreement between the two is interpretable.
     """
-    base = _score(model, X)
+    base = score_dnn(model, X)
     stds = X.std(axis=0)
     sensitivity: dict[str, float] = {}
     for i, name in enumerate(feature_names):
@@ -310,8 +299,8 @@ def perturbation_importance(
         X_up[:, i] += shift
         X_dn = X.copy()
         X_dn[:, i] -= shift
-        delta_up = np.abs(_score(model, X_up) - base)
-        delta_dn = np.abs(_score(model, X_dn) - base)
+        delta_up = np.abs(score_dnn(model, X_up) - base)
+        delta_dn = np.abs(score_dnn(model, X_dn) - base)
         sensitivity[name] = float(0.5 * (delta_up.mean() + delta_dn.mean()))
     return sensitivity
 
@@ -378,40 +367,45 @@ def cut_baseline_metrics(
 # ---------------------------------------------------------------------------
 
 
-def _scan_thresholds(
-    scores: np.ndarray, y: np.ndarray, w: np.ndarray, cut_tpr: float, z_cut: float
+def scan_thresholds(
+    scores: np.ndarray, y: np.ndarray, w: np.ndarray, cut_tpr: float, z_cut: float,
+    label: str = "Model",
 ) -> tuple[float, float, float, float, float, float, float, float, float, float]:
     """Scan all ROC thresholds for optimal Asimov Z and cut-TPR-matched Z.
+
+    ``label`` is used as the prefix in the two log lines (e.g. "DNN", "XGBoost")
+    so the same scan can be reused across different classifiers without
+    misattributing results.
 
     Returns (z_opt, tpr_opt, fpr_opt, s_opt, b_opt,
              z_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr).
     """
     fpr_vals, tpr_vals, score_thresholds = roc_curve(y, scores)
     z_scan = np.array([
-        asimov_significance(*_yields(scores, y, w, float(t)))
+        asimov_significance(*compute_yields(scores, y, w, float(t)))
         for t in score_thresholds
     ])
 
     opt_idx = int(np.argmax(z_scan))
     threshold_opt = float(score_thresholds[opt_idx])
-    s_opt, b_opt = _yields(scores, y, w, threshold_opt)
+    s_opt, b_opt = compute_yields(scores, y, w, threshold_opt)
     z_opt = float(z_scan[opt_idx])
     tpr_opt = float(tpr_vals[opt_idx])
     fpr_opt = float(fpr_vals[opt_idx])
     LOGGER.info(
-        "DNN @ optimal threshold (threshold=%.4f): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f  (gain over cut-based: %+.3f)",
-        threshold_opt, tpr_opt, fpr_opt, s_opt, b_opt, z_opt, z_opt - z_cut,
+        "%s @ optimal threshold (threshold=%.4f): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f  (gain over cut-based: %+.3f)",
+        label, threshold_opt, tpr_opt, fpr_opt, s_opt, b_opt, z_opt, z_opt - z_cut,
     )
 
     cut_match_idx = int(np.argmin(np.abs(tpr_vals - cut_tpr)))
     threshold_cut_tpr = float(score_thresholds[cut_match_idx])
     tpr_matched = float(tpr_vals[cut_match_idx])
     fpr_matched = float(fpr_vals[cut_match_idx])
-    s_cut_tpr, b_cut_tpr = _yields(scores, y, w, threshold_cut_tpr)
+    s_cut_tpr, b_cut_tpr = compute_yields(scores, y, w, threshold_cut_tpr)
     z_cut_tpr = asimov_significance(s_cut_tpr, b_cut_tpr)
     LOGGER.info(
-        "DNN @ cut-based TPR (threshold=%.4f): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f  (gain over cut-based: %+.3f)",
-        threshold_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr, z_cut_tpr, z_cut_tpr - z_cut,
+        "%s @ cut-based TPR (threshold=%.4f): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f  (gain over cut-based: %+.3f)",
+        label, threshold_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr, z_cut_tpr, z_cut_tpr - z_cut,
     )
 
     return z_opt, tpr_opt, fpr_opt, s_opt, b_opt, z_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr
@@ -460,8 +454,8 @@ def run_evaluation(config: TrainingConfig) -> None:
         )
 
     # --- Score train / test -------------------------------------------
-    scores_train = _score(model, X_train)
-    scores_test = _score(model, X_test)
+    scores_train = score_dnn(model, X_train)
+    scores_test = score_dnn(model, X_test)
 
     # --- Cut-based baseline ------------------------------------------
     cut_tpr, cut_fpr, s_cut, b_cut = cut_baseline_metrics(
@@ -475,7 +469,7 @@ def run_evaluation(config: TrainingConfig) -> None:
 
     # --- Threshold scan: optimal Z and cut-TPR match -----------------
     z_opt, tpr_opt, fpr_opt, s_opt, b_opt, z_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr = (
-        _scan_thresholds(scores_test, y_test, w_test, cut_tpr, z_cut)
+        scan_thresholds(scores_test, y_test, w_test, cut_tpr, z_cut, label="DNN")
     )
 
     # --- ROC + score distributions + KS -------------------------------
