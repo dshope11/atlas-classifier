@@ -94,6 +94,7 @@ def objective(trial: optuna.Trial, base_config: TrainingConfig, tune_dir: Path) 
         train(trial_config)
     except Exception as exc:
         LOGGER.warning("Trial %d failed during training: %s", trial.number, exc)
+        shutil.rmtree(Path(paths["checkpoint_path"]).parent, ignore_errors=True)
         return float("nan")
 
     history_path = Path(paths["loss_history_path"])
@@ -122,7 +123,7 @@ def _trial_value(t: optuna.trial.FrozenTrial) -> float:
     Used as a sort key over study.trials so that pre-filtered trials sort safely
     even when mypy can't prove they're non-None.
     """
-    return t.value if (t.value is not None and not math.isnan(t.value)) else -math.inf
+    return t.value if _is_valid(t.value) else -math.inf
 
 
 def main() -> int:

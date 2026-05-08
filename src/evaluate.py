@@ -97,7 +97,6 @@ def plot_feature_distributions(
         ax = axes[i // n_cols][i % n_cols]
         x_sig = X[sig_mask, i]
         x_bkg = X[bkg_mask, i]
-        # Use the common range so the two histograms are comparable
         lo = float(np.percentile(np.concatenate([x_sig, x_bkg]), 1))
         hi = float(np.percentile(np.concatenate([x_sig, x_bkg]), 99))
         bins = np.linspace(lo, hi, 50)
@@ -375,6 +374,50 @@ def cut_baseline_metrics(
 
 
 # ---------------------------------------------------------------------------
+# Threshold scan
+# ---------------------------------------------------------------------------
+
+
+def _scan_thresholds(
+    scores: np.ndarray, y: np.ndarray, w: np.ndarray, cut_tpr: float, z_cut: float
+) -> tuple[float, float, float, float, float, float, float, float, float, float]:
+    """Scan all ROC thresholds for optimal Asimov Z and cut-TPR-matched Z.
+
+    Returns (z_opt, tpr_opt, fpr_opt, s_opt, b_opt,
+             z_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr).
+    """
+    fpr_vals, tpr_vals, score_thresholds = roc_curve(y, scores)
+    z_scan = np.array([
+        asimov_significance(*_yields(scores, y, w, float(t)))
+        for t in score_thresholds
+    ])
+
+    opt_idx = int(np.argmax(z_scan))
+    threshold_opt = float(score_thresholds[opt_idx])
+    s_opt, b_opt = _yields(scores, y, w, threshold_opt)
+    z_opt = float(z_scan[opt_idx])
+    tpr_opt = float(tpr_vals[opt_idx])
+    fpr_opt = float(fpr_vals[opt_idx])
+    LOGGER.info(
+        "DNN @ optimal threshold (threshold=%.4f): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f  (gain over cut-based: %+.3f)",
+        threshold_opt, tpr_opt, fpr_opt, s_opt, b_opt, z_opt, z_opt - z_cut,
+    )
+
+    cut_match_idx = int(np.argmin(np.abs(tpr_vals - cut_tpr)))
+    threshold_cut_tpr = float(score_thresholds[cut_match_idx])
+    tpr_matched = float(tpr_vals[cut_match_idx])
+    fpr_matched = float(fpr_vals[cut_match_idx])
+    s_cut_tpr, b_cut_tpr = _yields(scores, y, w, threshold_cut_tpr)
+    z_cut_tpr = asimov_significance(s_cut_tpr, b_cut_tpr)
+    LOGGER.info(
+        "DNN @ cut-based TPR (threshold=%.4f): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f  (gain over cut-based: %+.3f)",
+        threshold_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr, z_cut_tpr, z_cut_tpr - z_cut,
+    )
+
+    return z_opt, tpr_opt, fpr_opt, s_opt, b_opt, z_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr
+
+
+# ---------------------------------------------------------------------------
 # Top-level driver
 # ---------------------------------------------------------------------------
 
@@ -431,32 +474,8 @@ def run_evaluation(config: TrainingConfig) -> None:
     )
 
     # --- Threshold scan: optimal Z and cut-TPR match -----------------
-    fpr_vals, tpr_vals, score_thresholds = roc_curve(y_test, scores_test)
-    z_scan = np.array([
-        asimov_significance(*_yields(scores_test, y_test, w_test, float(t)))
-        for t in score_thresholds
-    ])
-
-    opt_idx       = int(np.argmax(z_scan))
-    z_opt         = float(z_scan[opt_idx])
-    tpr_opt       = float(tpr_vals[opt_idx])
-    fpr_opt       = float(fpr_vals[opt_idx])
-    threshold_opt = float(score_thresholds[opt_idx])
-    s_opt, b_opt  = _yields(scores_test, y_test, w_test, threshold_opt)
-    LOGGER.info(
-        "DNN @ optimal threshold (threshold=%.4f): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f  (gain over cut-based: %+.3f)",
-        threshold_opt, tpr_opt, fpr_opt, s_opt, b_opt, z_opt, z_opt - z_cut,
-    )
-
-    cut_match_idx         = int(np.argmin(np.abs(tpr_vals - cut_tpr)))
-    threshold_cut_tpr     = float(score_thresholds[cut_match_idx])
-    tpr_matched           = float(tpr_vals[cut_match_idx])
-    fpr_matched           = float(fpr_vals[cut_match_idx])
-    s_cut_tpr, b_cut_tpr  = _yields(scores_test, y_test, w_test, threshold_cut_tpr)
-    z_cut_tpr             = asimov_significance(s_cut_tpr, b_cut_tpr)
-    LOGGER.info(
-        "DNN @ cut-based TPR (threshold=%.4f): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f  (gain over cut-based: %+.3f)",
-        threshold_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr, z_cut_tpr, z_cut_tpr - z_cut,
+    z_opt, tpr_opt, fpr_opt, s_opt, b_opt, z_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr = (
+        _scan_thresholds(scores_test, y_test, w_test, cut_tpr, z_cut)
     )
 
     # --- ROC + score distributions + KS -------------------------------
