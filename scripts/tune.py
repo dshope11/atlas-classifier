@@ -100,7 +100,7 @@ def objective(trial: optuna.Trial, base_config: TrainingConfig, tune_dir: Path) 
     history_path = Path(paths["loss_history_path"])
     if not history_path.exists():
         # Training aborted (e.g. non-finite loss) before writing history
-        LOGGER.warning("Trial %d: no history written — likely non-finite loss", trial.number)
+        LOGGER.warning("Trial %d: no history written - likely non-finite loss", trial.number)
         return float("nan")
 
     with history_path.open() as f:
@@ -182,7 +182,7 @@ def main() -> int:
     )
 
     LOGGER.info("=" * 70)
-    LOGGER.info("Study complete — %d trials", len(study.trials))
+    LOGGER.info("Study complete - %d trials", len(study.trials))
 
     valid_trials = sorted(
         (t for t in study.trials if _is_valid(t.value)),
@@ -191,7 +191,7 @@ def main() -> int:
     )
 
     if not valid_trials:
-        LOGGER.error("No trials completed successfully — nothing to promote")
+        LOGGER.error("No trials completed successfully - nothing to promote")
         return 1
 
     LOGGER.info("Top %d trials:", min(5, len(valid_trials)))
@@ -205,8 +205,8 @@ def main() -> int:
     target_ckpt.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(best_paths["checkpoint_path"], target_ckpt)
     shutil.copy2(best_paths["loss_history_path"], target_hist)
-    LOGGER.info("Promoted trial %d checkpoint → %s", best.number, target_ckpt)
-    LOGGER.info("Promoted trial %d history    → %s", best.number, target_hist)
+    LOGGER.info("Promoted trial %d checkpoint -> %s", best.number, target_ckpt)
+    LOGGER.info("Promoted trial %d history    -> %s", best.number, target_hist)
 
     hs = _parse_hidden(best.params["hidden_sizes"])
     LOGGER.info(

@@ -1,7 +1,7 @@
-# atlas-classifier — training configuration
+# atlas-classifier - training configuration
 #
 # All keys correspond to fields in src/config.py:TrainingConfig. Unknown keys
-# raise an error at load time. Defaults shown match the dataclass — change here
+# raise an error at load time. Defaults shown match the dataclass - change here
 # rather than in code.
 
 # --- Architecture + training hyperparameters ----------------------------
@@ -18,7 +18,7 @@ batch_size: 256
 working_point_signal_eff: 0.30   # per-epoch val Z diagnostic during training only; not used in evaluate.py
 
 # --- Data ----------------------------------------------------------------
-lumi: 36.1                 # fb^-1 — see notes/data_sources.md for choice
+lumi: 36.1                 # fb^-1 - see notes/data_sources.md for choice
 train_val_test_split: [0.70, 0.15, 0.15]
 random_seed: 42
 
@@ -26,7 +26,7 @@ random_seed: 42
 lr_patience: 10
 lr_factor: 0.5
 
-# --- Event selection cuts (DSL — see src/utils.py:evaluate_cuts) --------
+# --- Event selection cuts (DSL - see src/utils.py:evaluate_cuts) --------
 # Pre-cut scalars (lead_lep_pt, sublead_lep_pt, lep_charge_product) are
 # computed in data_loading.py before evaluate_cuts is called.
 # 2025 release branch names: lep_n, jet_n; energies/momenta in GeV.
@@ -35,12 +35,12 @@ cuts:
     - ["jet_n", "== 0"]
     - ["lep_n", "== 2"]
     - ["lep_charge_product", "< 0"]    # opposite sign
-    - ["lep_type_product", "== 143"]   # DF only: eμ (11×13=143)
+    - ["lep_type_product", "== 143"]   # DF only: emu (11*13=143)
     - ["lead_lep_pt", "> 25"]          # 25 GeV
     - ["sublead_lep_pt", "> 15"]       # 15 GeV
-    - ["met", "> 20"]                  # 20 GeV — ensures MET direction is well-defined
-    - ["mll", "> 10"]                  # 10 GeV — DF preselection, removes low-mass resonances
-    # mll < 55 and dphi_ll_met > π/2 removed — let DNN learn these boundaries from data
+    - ["met", "> 20"]                  # 20 GeV - ensures MET direction is well-defined
+    - ["mll", "> 10"]                  # 10 GeV - DF preselection, removes low-mass resonances
+    # mll < 55 and dphi_ll_met > pi/2 removed - let DNN learn these boundaries from data
 
 # --- Cut-based baseline (uses feature names from split.h5) ---------------
 # Applied to test-set feature matrix for Asimov Z comparison in evaluate.py.
@@ -48,7 +48,7 @@ cuts:
 baseline_cuts:
   and:
     - ["m_ll", "< 55"]             # Higgs spin-0 kinematics + WW/top suppression
-    - ["dphi_ll_met", "> 1.57"]    # > π/2 — MET mismeasurement + Z→ττ suppression
+    - ["dphi_ll_met", "> 1.57"]    # > pi/2 - MET mismeasurement + Z->tau-tau suppression
     - ["m_T", "< 125"]             # primary discriminant: kinematic edge at m_H
     - ["dphi_ll", "< 2.0"]         # collinear lepton requirement (Run 2 uses 2.0 rad)
 

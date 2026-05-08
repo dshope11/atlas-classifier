@@ -12,7 +12,7 @@ split.h5 are passed directly. Physics weights are used only in evaluation (same
 convention as the DNN: no sample_weight in training).
 
 Outputs:
-- ``data/processed/eval/roc_comparison.png`` — overlaid ROC curves + cut-based WP
+- ``data/processed/eval/roc_comparison.png`` - overlaid ROC curves + cut-based WP
 - Logged summary table
 
 Usage:
@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 from typing import Any, cast
 
-# macOS ships two OpenMP runtimes in this process — one bundled with PyTorch's
+# macOS ships two OpenMP runtimes in this process - one bundled with PyTorch's
 # libomp, one with XGBoost's. Letting either auto-thread leads to a segfault on
 # the second XGBClassifier.fit() call inside the HPO loop. Pinning to 1 thread
 # before xgboost is imported is the canonical workaround. Per-trial fit is then
@@ -99,7 +99,7 @@ def run_hpo(X_train: np.ndarray, y_train: np.ndarray,
     )
     best = study.best_trial
     LOGGER.info(
-        "HPO complete — best trial %d: val_auc=%.4f  params=%s",
+        "HPO complete - best trial %d: val_auc=%.4f  params=%s",
         best.number, best.value, best.params,
     )
     return best.params
@@ -118,7 +118,7 @@ def plot_roc_comparison(
     cut_tpr: float,
     out_path: Path,
 ) -> tuple[float, float]:
-    """Overlaid DNN + XGBoost ROC curves with Clopper–Pearson bands + cut-based WP.
+    """Overlaid DNN + XGBoost ROC curves with Clopper-Pearson bands + cut-based WP.
 
     Returns (dnn_auc, xgb_auc).
     """
@@ -184,7 +184,7 @@ def run_comparison(config: TrainingConfig, n_trials: int) -> None:
     y_test  = cast(np.ndarray, split["y_test"])
     w_test  = cast(np.ndarray, split["w_test"])
     LOGGER.info(
-        "Split loaded — train=%d  val=%d  test=%d  features=%d",
+        "Split loaded - train=%d  val=%d  test=%d  features=%d",
         len(X_train), len(X_val), len(X_test), X_train.shape[1],
     )
 
@@ -216,7 +216,7 @@ def run_comparison(config: TrainingConfig, n_trials: int) -> None:
     xgb_val_auc = float(roc_auc_score(y_val, clf.predict_proba(X_val)[:, 1]))
     xgb_test_auc = float(roc_auc_score(y_test, clf.predict_proba(X_test)[:, 1]))
     LOGGER.info(
-        "XGBoost trained — best_iteration=%d  val_auc=%.4f  test_auc=%.4f",
+        "XGBoost trained - best_iteration=%d  val_auc=%.4f  test_auc=%.4f",
         clf.best_iteration, xgb_val_auc, xgb_test_auc,
     )
 
@@ -268,11 +268,11 @@ def run_comparison(config: TrainingConfig, n_trials: int) -> None:
     LOGGER.info("=" * 70)
     LOGGER.info("Cut-based  Z: %.3f  (s=%.2f  b=%.2f)", z_cut, s_cut, b_cut)
     LOGGER.info(
-        "DNN        AUC: %.4f  Z @ opt: %.3f  (ΔZ=%+.3f)  Z @ cut-TPR: %.3f  (ΔZ=%+.3f)",
+        "DNN        AUC: %.4f  Z @ opt: %.3f  (dZ=%+.3f)  Z @ cut-TPR: %.3f  (dZ=%+.3f)",
         dnn_auc, dnn_z_opt, dnn_z_opt - z_cut, dnn_z_cut_tpr, dnn_z_cut_tpr - z_cut,
     )
     LOGGER.info(
-        "XGBoost    AUC: %.4f  Z @ opt: %.3f  (ΔZ=%+.3f)  Z @ cut-TPR: %.3f  (ΔZ=%+.3f)",
+        "XGBoost    AUC: %.4f  Z @ opt: %.3f  (dZ=%+.3f)  Z @ cut-TPR: %.3f  (dZ=%+.3f)",
         xgb_auc, xgb_z_opt, xgb_z_opt - z_cut, xgb_z_cut_tpr, xgb_z_cut_tpr - z_cut,
     )
     LOGGER.info("Plots written to: %s", out_dir)

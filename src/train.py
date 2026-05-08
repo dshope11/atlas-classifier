@@ -4,13 +4,13 @@ Loads the split produced by :mod:`src.preprocessing`, builds the model with
 ``RobustScaler`` stats from the train split (in-model normalisation via
 ``register_buffer``), and trains with:
 
-* ``BCEWithLogitsLoss`` with counts-based ``pos_weight = n_bg / n_sig`` —
+* ``BCEWithLogitsLoss`` with counts-based ``pos_weight = n_bg / n_sig`` -
   no physics weights in the loss (clean separation principle).
 * Adam optimiser; ``ReduceLROnPlateau`` LR schedule on val loss.
 * Early stopping on val loss (restores best weights).
-* NaN/instability guard — halts training if the loss becomes non-finite.
+* NaN/instability guard - halts training if the loss becomes non-finite.
 * Per-epoch diagnostics: val loss, val AUC, **val Asimov significance**
-  at the configured working point computed with physics weights — diagnostic
+  at the configured working point computed with physics weights - diagnostic
   only, never influences early stopping or gradient updates.
 
 Saves a self-describing checkpoint (state_dict + feature_names + hyperparams)
@@ -43,7 +43,7 @@ LOGGER = logging.getLogger(Path(__file__).stem)
 
 
 def _select_device() -> torch.device:
-    """Prefer MPS (Apple Silicon) → CUDA → CPU."""
+    """Prefer MPS (Apple Silicon) -> CUDA -> CPU."""
     if torch.backends.mps.is_available():
         return torch.device("mps")
     if torch.cuda.is_available():
@@ -95,7 +95,7 @@ def _val_significance(
     """Asimov Z at a threshold giving ``signal_eff_target`` (unweighted) on signal.
 
     The threshold is set so that ``signal_eff_target`` fraction of signal events
-    pass (counts-based — simple working-point definition). Yields s and b on
+    pass (counts-based - simple working-point definition). Yields s and b on
     that side of the cut are computed with full physics weights ``w``.
     """
     proba = 1.0 / (1.0 + np.exp(-logits))
@@ -129,13 +129,13 @@ def train(config: TrainingConfig) -> None:
     median = cast(np.ndarray, split["scaler_median"])
     iqr = cast(np.ndarray, split["scaler_iqr"])
 
-    # Counts-based class balance — see notes/data_sources.md and the README
+    # Counts-based class balance - see notes/data_sources.md and the README
     # weight-design discussion for why we don't put physics weights here.
     n_pos = int((y_train == 1).sum())
     n_neg = int((y_train == 0).sum())
     pos_weight = torch.tensor([n_neg / n_pos], dtype=torch.float32, device=device)
     LOGGER.info(
-        "Train counts — signal=%d  background=%d  pos_weight=%.4f",
+        "Train counts - signal=%d  background=%d  pos_weight=%.4f",
         n_pos, n_neg, pos_weight.item(),
     )
 
@@ -170,7 +170,7 @@ def train(config: TrainingConfig) -> None:
             loss = criterion(logits, yb_d)
             if not torch.isfinite(loss):
                 LOGGER.error(
-                    "Non-finite loss at epoch %d (loss=%s) — halting training",
+                    "Non-finite loss at epoch %d (loss=%s) - halting training",
                     epoch, loss.item(),
                 )
                 return
@@ -188,7 +188,7 @@ def train(config: TrainingConfig) -> None:
         scheduler.step(val_loss)
         new_lr = optimizer.param_groups[0]["lr"]
         if new_lr != prev_lr:
-            LOGGER.info("LR reduced: %.2e → %.2e", prev_lr, new_lr)
+            LOGGER.info("LR reduced: %.2e -> %.2e", prev_lr, new_lr)
 
         history.append({
             "epoch": epoch,

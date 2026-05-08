@@ -8,13 +8,13 @@ Six small, decoupled helpers used across data loading, training, and evaluation:
   into an ``OrderedDict`` for end-of-run reporting.
 
 - ``asimov_significance``: discovery significance using Cowan et al. 2011, Eq. 97.
-  Reduces to S/√B in the s ≪ b limit. Used for both the cut-based baseline and
+  Reduces to S/sqrt(B) in the s << b limit. Used for both the cut-based baseline and
   the working-point comparison.
 
 - ``compute_yields``: sum of physics weights passing a score threshold, split by
   signal and background label.
 
-- ``clopper_pearson``: 1σ Clopper–Pearson binomial confidence interval.
+- ``clopper_pearson``: 1sigma Clopper-Pearson binomial confidence interval.
 
 - ``evaluate_cuts``: a recursive boolean evaluator for a small YAML cut DSL
   (``{"and": [["var", "> X"], {"or": [...]}]}``).
@@ -36,7 +36,7 @@ from scipy.stats import beta as _beta_dist
 
 
 # ---------------------------------------------------------------------------
-# setup_logging — stdout + file handler on the root logger
+# setup_logging - stdout + file handler on the root logger
 # ---------------------------------------------------------------------------
 
 
@@ -50,7 +50,7 @@ def setup_logging(log_path: str) -> None:
     )
 
 # ---------------------------------------------------------------------------
-# chronomat — wall-clock timing decorator
+# chronomat - wall-clock timing decorator
 # ---------------------------------------------------------------------------
 
 _TIMINGS: OrderedDict[str, float] = OrderedDict()
@@ -92,18 +92,18 @@ def print_timings(logger: Any | None = None) -> None:
 
 
 # ---------------------------------------------------------------------------
-# asimov_significance — Cowan et al. 2011, Eq. 97
+# asimov_significance - Cowan et al. 2011, Eq. 97
 # ---------------------------------------------------------------------------
 
 
 def asimov_significance(s: float, b: float) -> float:
-    """Asimov discovery significance ``Z = √(2·[(s+b)·ln(1 + s/b) − s])``.
+    """Asimov discovery significance ``Z = sqrt(2 * [(s+b) * ln(1 + s/b) - s])``.
 
     Source: Cowan, Cranmer, Gross, Vitells, "Asymptotic formulae for likelihood-based
     tests of new physics", Eur. Phys. J. C 71 (2011) 1554, Eq. 97.
 
-    Reduces to S/√B in the s ≪ b limit but handles the s ~ b regime correctly.
-    Returns 0 if ``b ≤ 0`` (no background — significance undefined).
+    Reduces to S/sqrt(B) in the s << b limit but handles the s ~ b regime correctly.
+    Returns 0 if ``b <= 0`` (no background - significance undefined).
     """
     if b <= 0:
         return 0.0
@@ -111,7 +111,7 @@ def asimov_significance(s: float, b: float) -> float:
 
 
 # ---------------------------------------------------------------------------
-# compute_yields — weighted signal/background yields above a score threshold
+# compute_yields - weighted signal/background yields above a score threshold
 # ---------------------------------------------------------------------------
 
 
@@ -126,17 +126,17 @@ def compute_yields(
 
 
 # ---------------------------------------------------------------------------
-# clopper_pearson — 1σ Clopper–Pearson binomial confidence interval
+# clopper_pearson - 1sigma Clopper-Pearson binomial confidence interval
 # ---------------------------------------------------------------------------
 
 
 def clopper_pearson(
     k: np.ndarray, n: np.ndarray, alpha: float = 0.3173
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Clopper–Pearson 1σ binomial confidence interval for k successes in n trials.
+    """Clopper-Pearson 1sigma binomial confidence interval for k successes in n trials.
 
-    alpha = 1 − 0.6827 ≈ 0.3173 → returns the (lo, hi) bounds bracketing the
-    central 68.27% of the distribution (one Gaussian σ).
+    alpha = 1 - 0.6827 ~= 0.3173; returns the (lo, hi) bounds bracketing the
+    central 68.27% of the distribution (one Gaussian sigma).
     """
     lo = np.where(k == 0, 0.0, _beta_dist.ppf(alpha / 2, k, n - k + 1))
     hi = np.where(k == n, 1.0, _beta_dist.ppf(1 - alpha / 2, k + 1, n - k))
@@ -144,7 +144,7 @@ def clopper_pearson(
 
 
 # ---------------------------------------------------------------------------
-# evaluate_cuts — recursive YAML cut DSL
+# evaluate_cuts - recursive YAML cut DSL
 # ---------------------------------------------------------------------------
 
 _OPERATORS: dict[str, Callable[[Any, Any], Any]] = {
@@ -182,9 +182,9 @@ def evaluate_cuts(events: Any, cuts: Any) -> np.ndarray:
 
     A cut is one of:
 
-    * **Leaf**: ``["var_name", "op value"]`` — evaluates ``events[var_name] op value``
-    * **And node**: ``{"and": [cut, cut, ...]}`` — element-wise logical AND
-    * **Or node**:  ``{"or":  [cut, cut, ...]}`` — element-wise logical OR
+    * **Leaf**: ``["var_name", "op value"]`` - evaluates ``events[var_name] op value``
+    * **And node**: ``{"and": [cut, cut, ...]}`` - element-wise logical AND
+    * **Or node**:  ``{"or":  [cut, cut, ...]}`` - element-wise logical OR
 
     Returns a boolean numpy array of the same length as ``events``.
     """

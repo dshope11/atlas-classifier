@@ -6,24 +6,24 @@ and writes ``data/processed/split.h5`` containing:
 * raw (un-normalised) feature arrays per split
 * per-event labels and physics weights per split
 * ``RobustScaler`` stats (median, IQR) computed from the **train split only**
-  — these travel inside the model checkpoint via ``register_buffer()``, not
+  - these travel inside the model checkpoint via ``register_buffer()``, not
   applied to the saved features
 * feature names (for inference-time validation against the model)
 
-Composite features (initial set; ``n_features`` is parameterised — adding
+Composite features (initial set; ``n_features`` is parameterised - adding
 a feature requires only extending :data:`FEATURE_FNS` and reprocessing):
 
 ================  ===================================================
 ``m_ll``          Dilepton invariant mass via 4-vector sum
 ``pT_ll``         Magnitude of the dilepton system transverse momentum
-``dphi_ll``       |Δφ| between the two leptons, wrapped to [0, π]
-``dphi_ll_met``   |Δφ| between the dilepton system and MET
-``m_T``           Transverse mass: √(2 · pT_ll · MET · (1 − cos Δφ_ll,MET))
+``dphi_ll``       |dphi| between the two leptons, wrapped to [0, pi]
+``dphi_ll_met``   |dphi| between the dilepton system and MET
+``m_T``           Transverse mass: sqrt(2 * pT_ll * MET * (1 - cos dphi_ll,MET))
 ================  ===================================================
 
 The 3-way split fractions and random seed live in ``TrainingConfig``.
 ``StratifiedShuffleSplit`` ensures ``is_signal`` proportions are preserved
-in train/val/test — important because plain random shuffle can drift on
+in train/val/test - important because plain random shuffle can drift on
 small classes.
 """
 
@@ -54,12 +54,12 @@ LOGGER = logging.getLogger(Path(__file__).stem)
 
 
 def _wrap_to_pi(angle: np.ndarray) -> np.ndarray:
-    """Wrap an angle to [−π, π] (inclusive)."""
+    """Wrap an angle to [-pi, pi] (inclusive)."""
     return cast(np.ndarray, np.arctan2(np.sin(angle), np.cos(angle)))
 
 
 def _abs_dphi(phi_a: np.ndarray, phi_b: np.ndarray) -> np.ndarray:
-    """|Δφ| between two angle arrays, in [0, π]."""
+    """|dphi| between two angle arrays, in [0, pi]."""
     return cast(np.ndarray, np.abs(_wrap_to_pi(phi_a - phi_b)))
 
 
@@ -78,7 +78,7 @@ def _m_ll(events: np.ndarray) -> np.ndarray:
     pz = pt1 * np.sinh(eta1) + pt2 * np.sinh(eta2)
     energy = e1 + e2
     m_sq = energy * energy - (px * px + py * py + pz * pz)
-    # Float-precision negative values are physical zero — clip to avoid sqrt(NaN)
+    # Float-precision negative values are physical zero - clip to avoid sqrt(NaN)
     return np.sqrt(np.clip(m_sq, 0.0, None))
 
 
@@ -111,7 +111,7 @@ def _dphi_ll_met(events: np.ndarray) -> np.ndarray:
 
 
 def _m_T(events: np.ndarray) -> np.ndarray:
-    """Transverse mass m_T = √(2 · pT_ll · MET · (1 − cos Δφ_ll,MET))."""
+    """Transverse mass m_T = sqrt(2 * pT_ll * MET * (1 - cos dphi_ll,MET))."""
     ptll = _pT_ll(events)
     met = events["met"].astype(np.float64)
     dphi = _dphi_ll_met(events)
@@ -138,7 +138,7 @@ def _eta_sublead(events: np.ndarray) -> np.ndarray:
     return events["lep_eta_sublead"].astype(np.float64)
 
 
-# Feature registry — order is the column order in X. Adding a feature here
+# Feature registry - order is the column order in X. Adding a feature here
 # is the only change needed in code; the model and HDF5 schema adapt to
 # len(FEATURE_FNS) automatically.
 FEATURE_FNS: dict[str, Callable[[np.ndarray], np.ndarray]] = {
@@ -148,7 +148,7 @@ FEATURE_FNS: dict[str, Callable[[np.ndarray], np.ndarray]] = {
     "dphi_ll":     _dphi_ll,
     "dphi_ll_met": _dphi_ll_met,
     "m_T":         _m_T,
-    # Raw kinematics — motivated by Run 2 H→WW DNN (ANA-HIGP-2024-07)
+    # Raw kinematics - motivated by Run 2 H->WW DNN (ANA-HIGP-2024-07)
     "pt_lead":     _pt_lead,
     "pt_sublead":  _pt_sublead,
     "met":         _met,
@@ -170,7 +170,7 @@ def build_features(events_path: str | Path) -> tuple[Features, Labels, Weights]:
         Binary labels, shape ``(n_events,)``, dtype ``int8``.
     w
         Per-event physics weights, shape ``(n_events,)``, dtype ``float64``.
-        Used in evaluation only — never in training.
+        Used in evaluation only - never in training.
     """
     with h5py.File(events_path, "r") as f:
         events = f["events"][:]
@@ -182,7 +182,7 @@ def build_features(events_path: str | Path) -> tuple[Features, Labels, Weights]:
 
 
 # ---------------------------------------------------------------------------
-# Scaler stats — RobustScaler (median ± IQR)
+# Scaler stats - RobustScaler (median +/- IQR)
 # ---------------------------------------------------------------------------
 
 
@@ -191,7 +191,7 @@ def compute_scaler_stats(X_train: Features) -> tuple[np.ndarray, np.ndarray]:
 
     IQR floors at 1.0 to avoid division-by-zero when a feature is constant.
     These stats are passed to the model constructor and stored via
-    ``register_buffer()`` — see ``src/model.py``.
+    ``register_buffer()`` - see ``src/model.py``.
     """
     median = np.median(X_train, axis=0).astype(np.float64)
     q75 = np.percentile(X_train, 75, axis=0).astype(np.float64)
@@ -261,11 +261,11 @@ def build_and_save_split(config: TrainingConfig) -> None:
             grp.create_dataset("w", data=w[idx], compression="lzf")
             grp.create_dataset("idx", data=idx, compression="lzf")
 
-        # Scaler stats — feed into model constructor
+        # Scaler stats - feed into model constructor
         f.create_dataset("scaler_median", data=median)
         f.create_dataset("scaler_iqr", data=iqr)
 
-        # Feature schema — used both at model construction and for inference validation
+        # Feature schema - used both at model construction and for inference validation
         f.create_dataset(
             "feature_names",
             data=np.array(FEATURE_NAMES, dtype=h5py.string_dtype(encoding="utf-8")),
@@ -277,7 +277,7 @@ def build_and_save_split(config: TrainingConfig) -> None:
 def load_split(split_path: str | Path) -> dict[str, np.ndarray | list[str]]:
     """Load a saved split and return a dict with X/y/w for train/val/test plus metadata.
 
-    The X arrays are **raw (un-normalised)** — normalisation is applied inside
+    The X arrays are **raw (un-normalised)** - normalisation is applied inside
     the model via ``register_buffer()``. The ``w`` arrays carry physics weights;
     they're passed through but only consumed by ``evaluate.py``.
     """

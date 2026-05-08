@@ -21,8 +21,8 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 Features: TypeAlias = np.ndarray  # shape (n_events, n_features)
-Labels: TypeAlias = np.ndarray  # shape (n_events,) — 0/1
-Weights: TypeAlias = np.ndarray  # shape (n_events,) — physics event weights
+Labels: TypeAlias = np.ndarray  # shape (n_events,) - 0/1
+Weights: TypeAlias = np.ndarray  # shape (n_events,) - physics event weights
 BatchDict: TypeAlias = "dict[str, torch.Tensor]"
 
 
@@ -52,7 +52,7 @@ class TrainingConfig:
     working_point_signal_eff: float = 0.30  # per-epoch val Z diagnostic during training only; not used in evaluate.py
 
     # --- Data ------------------------------------------------------------
-    lumi: float = 36.1  # fb⁻¹ — see notes/data_sources.md for choice rationale
+    lumi: float = 36.1  # fb^-1 - see notes/data_sources.md for choice rationale
     train_val_test_split: tuple[float, float, float] = (0.70, 0.15, 0.15)
     random_seed: int = 42
 
@@ -60,7 +60,7 @@ class TrainingConfig:
     lr_patience: int = 10
     lr_factor: float = 0.5
 
-    # --- Event selection cuts (nested DSL — see src/utils.py:evaluate_cuts) -
+    # --- Event selection cuts (nested DSL - see src/utils.py:evaluate_cuts) -
     cuts: dict[str, Any] = field(default_factory=dict)
     # Cut-based baseline applied to test-set features for Asimov Z comparison.
     # Variable names must match feature names in split.h5 (composite names).
@@ -126,7 +126,7 @@ class TrainingConfig:
 def load_config(path: str | Path = "config.yaml") -> TrainingConfig:
     """Load and validate a ``TrainingConfig`` from a YAML file.
 
-    Unknown keys raise a ``ValueError`` — this catches typos in config.yaml at
+    Unknown keys raise a ``ValueError`` - this catches typos in config.yaml at
     load time rather than silently ignoring them.
     """
     path = Path(path)
@@ -141,7 +141,7 @@ def load_config(path: str | Path = "config.yaml") -> TrainingConfig:
             f"Valid keys: {sorted(valid_fields)}"
         )
 
-    # YAML loads tuples as lists — convert split back to tuple
+    # YAML loads tuples as lists - convert split back to tuple
     if "train_val_test_split" in raw:
         raw["train_val_test_split"] = tuple(raw["train_val_test_split"])
 

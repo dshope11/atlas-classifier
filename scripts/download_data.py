@@ -41,7 +41,7 @@ def _get_url(dsid: int) -> str:
     if not files:
         raise RuntimeError(f"atlasopenmagic returned no files for DSID {dsid}")
     url = files[0]
-    # Strip simplecache:: prefix — we manage our own on-disk cache via data/raw
+    # Strip simplecache:: prefix - we manage our own on-disk cache via data/raw
     if url.startswith("simplecache::"):
         url = url[len("simplecache::"):]
     return str(url)
