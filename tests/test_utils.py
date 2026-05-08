@@ -1,11 +1,11 @@
-"""Tests for src.utils — asimov_significance, evaluate_cuts."""
+"""Tests for src.utils — asimov_significance, compute_yields, clopper_pearson, evaluate_cuts."""
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from src.utils import asimov_significance, evaluate_cuts
+from src.utils import asimov_significance, clopper_pearson, compute_yields, evaluate_cuts
 
 
 # ---------------------------------------------------------------------------
@@ -40,6 +40,67 @@ def test_asimov_monotonic_in_signal() -> None:
     b = 100.0
     zs = [asimov_significance(s, b) for s in [1, 5, 10, 20, 50]]
     assert all(zs[i] < zs[i + 1] for i in range(len(zs) - 1))
+
+
+# ---------------------------------------------------------------------------
+# compute_yields
+# ---------------------------------------------------------------------------
+
+
+def test_compute_yields_basic() -> None:
+    """Weighted signal and background yields are summed correctly above threshold."""
+    scores = np.array([0.1, 0.5, 0.8, 0.9])
+    y = np.array([0, 1, 0, 1])
+    w = np.array([2.0, 3.0, 4.0, 5.0])
+    s, b = compute_yields(scores, y, w, threshold=0.6)
+    # score >= 0.6: indices 2 (bkg, w=4) and 3 (sig, w=5)
+    assert s == pytest.approx(5.0)
+    assert b == pytest.approx(4.0)
+
+
+def test_compute_yields_threshold_is_inclusive() -> None:
+    """An event with score exactly equal to threshold must pass (>= not >)."""
+    scores = np.array([0.6, 0.3])
+    y = np.array([1, 0])
+    w = np.array([2.0, 1.0])
+    s, b = compute_yields(scores, y, w, threshold=0.6)
+    assert s == pytest.approx(2.0)
+    assert b == pytest.approx(0.0)
+
+
+def test_compute_yields_all_below_threshold() -> None:
+    scores = np.array([0.1, 0.2])
+    y = np.array([0, 1])
+    w = np.array([1.0, 1.0])
+    s, b = compute_yields(scores, y, w, threshold=0.9)
+    assert s == pytest.approx(0.0)
+    assert b == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# clopper_pearson
+# ---------------------------------------------------------------------------
+
+
+def test_clopper_pearson_k_zero_lo_is_zero() -> None:
+    """Lower bound must be exactly 0 when k=0 (no successes observed)."""
+    lo, hi = clopper_pearson(np.array([0]), np.array([10]))
+    assert lo[0] == pytest.approx(0.0)
+    assert 0.0 < hi[0] < 1.0
+
+
+def test_clopper_pearson_k_equals_n_hi_is_one() -> None:
+    """Upper bound must be exactly 1 when k=n (all trials succeeded)."""
+    lo, hi = clopper_pearson(np.array([10]), np.array([10]))
+    assert hi[0] == pytest.approx(1.0)
+    assert 0.0 < lo[0] < 1.0
+
+
+def test_clopper_pearson_central_interval_contains_true_rate() -> None:
+    """For k/n = 0.5, the 1-sigma interval should contain 0.5 and be plausibly narrow."""
+    lo, hi = clopper_pearson(np.array([50]), np.array([100]))
+    assert lo[0] < 0.5 < hi[0]
+    assert (hi[0] - lo[0]) < 0.15  # 68% CI on 100 trials is ~±5%
 
 
 # ---------------------------------------------------------------------------
