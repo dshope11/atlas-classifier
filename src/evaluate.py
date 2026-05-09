@@ -444,7 +444,7 @@ def run_evaluation(config: TrainingConfig) -> None:
 
     # --- Load model ---------------------------------------------------
     LOGGER.info("Loading checkpoint: %s", config.checkpoint_path)
-    ckpt = torch.load(config.checkpoint_path, weights_only=False)
+    ckpt = torch.load(config.checkpoint_path, weights_only=True)
     model = HWWClassifier.from_checkpoint(ckpt, config)
     model.eval()
     if model.feature_names != feature_names:

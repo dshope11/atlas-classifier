@@ -113,17 +113,14 @@ def objective(trial: optuna.Trial, base_config: TrainingConfig, tune_dir: Path) 
     return best_auc
 
 
-def _is_valid(value: float | None) -> bool:
-    return value is not None and not math.isnan(value)
-
 
 def _trial_value(t: optuna.trial.FrozenTrial) -> float:
     """Return ``t.value`` as a finite float, or ``-inf`` for failed/missing trials.
 
-    Used as a sort key over study.trials so that pre-filtered trials sort safely
-    even when mypy can't prove they're non-None.
+    Used as a sort key over study.trials so that pre-filtered trials sort safely.
     """
-    return t.value if _is_valid(t.value) else -math.inf
+    v = t.value
+    return v if v is not None and not math.isnan(v) else -math.inf
 
 
 def main() -> int:
@@ -185,7 +182,7 @@ def main() -> int:
     LOGGER.info("Study complete - %d trials", len(study.trials))
 
     valid_trials = sorted(
-        (t for t in study.trials if _is_valid(t.value)),
+        (t for t in study.trials if t.value is not None and not math.isnan(t.value)),
         key=_trial_value,
         reverse=True,
     )

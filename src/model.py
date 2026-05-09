@@ -114,9 +114,9 @@ class HWWClassifier(nn.Module):
 
     # -- Checkpoint I/O -----------------------------------------------------
     # We save state_dict + feature_names + config snapshot in one dict so the
-    # checkpoint is fully self-describing. weights_only=False is required to
-    # restore the feature_names list and the config dict; this is safe because
-    # the checkpoint is something we wrote ourselves.
+    # checkpoint is fully self-describing. All values are primitive Python types
+    # (str, int, float, list) or tensors, so torch.load with weights_only=True
+    # is safe and sufficient.
 
     def make_checkpoint(self, config: TrainingConfig) -> dict[str, Any]:
         """Build the dict to ``torch.save`` (state_dict + reconstruction metadata)."""

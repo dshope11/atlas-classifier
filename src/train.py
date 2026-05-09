@@ -169,11 +169,9 @@ def train(config: TrainingConfig) -> None:
             logits = model(xb_d)
             loss = criterion(logits, yb_d)
             if not torch.isfinite(loss):
-                LOGGER.error(
-                    "Non-finite loss at epoch %d (loss=%s) - halting training",
-                    epoch, loss.item(),
+                raise RuntimeError(
+                    f"Non-finite loss at epoch {epoch} (loss={loss.item()}) - halting"
                 )
-                return
             loss.backward()
             optimizer.step()
             train_loss_sum += loss.item() * len(xb_d)
@@ -246,7 +244,11 @@ def train(config: TrainingConfig) -> None:
 def main() -> int:
     config = load_config("config.yaml")
     setup_logging(config.log_path)
-    train(config)
+    try:
+        train(config)
+    except RuntimeError as e:
+        LOGGER.error("Training failed: %s", e)
+        return 1
     print_timings(LOGGER)
     return 0
 
