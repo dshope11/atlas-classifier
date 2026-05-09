@@ -15,8 +15,8 @@ For each sample registered in :mod:`src.sample_info`:
    formula (see ``notes/data_sources.md``); tag ``is_signal`` from the
    sample registry.
 
-All sample chunks are concatenated and written to a single HDF5 dataset
-``events`` as a structured numpy record array. The output file is validated
+Selected events are appended directly to a resizable HDF5 dataset named
+``events`` as structured numpy records. The output file is validated
 immediately afterward.
 """
 
@@ -180,19 +180,33 @@ def _process_sample(
     info: SampleInfo,
     lumi: float,
     cuts: dict[str, Any],
-) -> np.ndarray:
-    """Load one sample's ROOT file in chunks, apply cuts, return structured array."""
+    events: h5py.Dataset,
+) -> tuple[int, int]:
+    """Load one sample's ROOT file in chunks and append selected events to HDF5."""
     LOGGER.info("Loading %s  DSID=%d  file=%s", key, info.dsid, path.name)
-    chunks: list[np.ndarray] = []
+    n_sample = 0
+    n_signal = 0
     with uproot.open(path) as f:
         tree = f["analysis"]
         for arr in tree.iterate(_BRANCHES, library="ak", step_size=_ITERATE_STEP_SIZE):
-            chunks.append(_process_chunk(arr, info, lumi, cuts))
-    if not chunks:
-        return np.zeros(0, dtype=OUTPUT_DTYPE)
-    out = np.concatenate(chunks)
-    LOGGER.info("  %s: %d events kept (is_signal=%s)", key, len(out), info.is_signal)
-    return out
+            chunk = _process_chunk(arr, info, lumi, cuts)
+            if len(chunk) == 0:
+                continue
+            _append_events(events, chunk)
+            n_sample += len(chunk)
+            n_signal += int(chunk["is_signal"].sum())
+    LOGGER.info("  %s: %d events kept (is_signal=%s)", key, n_sample, info.is_signal)
+    return n_sample, n_signal
+
+
+def _append_events(events: h5py.Dataset, chunk: np.ndarray) -> None:
+    """Append one processed chunk to the resizable ``events`` dataset."""
+    if chunk.dtype != OUTPUT_DTYPE:
+        raise TypeError(f"Unexpected event dtype: {chunk.dtype} != {OUTPUT_DTYPE}")
+    old_size = len(events)
+    new_size = old_size + len(chunk)
+    events.resize((new_size,))
+    events[old_size:new_size] = chunk
 
 
 @chronomat
@@ -207,50 +221,79 @@ def load_to_hdf5(config: TrainingConfig) -> None:
     output = Path(config.processed_path)
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    chunks: list[np.ndarray] = []
-    for key, info in SAMPLES.items():
-        path = raw_dir / f"mc_{info.dsid}.root"
-        if not path.exists():
-            raise FileNotFoundError(
-                f"Missing ROOT file: {path}. Run scripts/download_data.py first."
+    tmp_output = output.with_name(f"{output.name}.tmp")
+    if tmp_output.exists():
+        tmp_output.unlink()
+
+    total_events = 0
+    n_sig = 0
+    try:
+        with h5py.File(tmp_output, "w") as f:
+            events = f.create_dataset(
+                "events",
+                shape=(0,),
+                maxshape=(None,),
+                dtype=OUTPUT_DTYPE,
+                chunks=True,
+                compression="lzf",
             )
-        chunks.append(_process_sample(path, key, info, config.lumi, config.cuts))
+            for key, info in SAMPLES.items():
+                path = raw_dir / f"mc_{info.dsid}.root"
+                if not path.exists():
+                    raise FileNotFoundError(
+                        f"Missing ROOT file: {path}. Run scripts/download_data.py first."
+                    )
+                n_sample, n_sample_sig = _process_sample(
+                    path, key, info, config.lumi, config.cuts, events
+                )
+                total_events += n_sample
+                n_sig += n_sample_sig
 
-    events = np.concatenate(chunks) if chunks else np.zeros(0, dtype=OUTPUT_DTYPE)
-    n_sig = int(events["is_signal"].sum())
-    n_bkg = len(events) - n_sig
-    LOGGER.info(
-        "Total events after selection: %d (signal: %d, background: %d)",
-        len(events), n_sig, n_bkg,
-    )
-    if n_sig == 0 or n_bkg == 0:
-        raise RuntimeError(
-            f"Empty class after selection - n_signal={n_sig}, n_background={n_bkg}. "
-            "Check cuts in config.yaml."
-        )
-
-    with h5py.File(output, "w") as f:
-        f.create_dataset("events", data=events, compression="lzf")
-        f.attrs["lumi_fb_inv"] = config.lumi
-        f.attrs["n_signal"] = n_sig
-        f.attrs["n_background"] = n_bkg
-
-    # Validate output - catch silent write failures
-    with h5py.File(output, "r") as f:
-        if "events" not in f:
-            raise RuntimeError(f"Output validation failed: 'events' missing in {output}")
-        if f["events"].dtype != OUTPUT_DTYPE:
-            raise RuntimeError(
-                f"Output validation failed: dtype mismatch in {output}: "
-                f"{f['events'].dtype} != {OUTPUT_DTYPE}"
+            n_bkg = total_events - n_sig
+            LOGGER.info(
+                "Total events after selection: %d (signal: %d, background: %d)",
+                total_events, n_sig, n_bkg,
             )
-        if len(f["events"]) != len(events):
-            raise RuntimeError(
-                f"Output validation failed: length mismatch in {output}: "
-                f"{len(f['events'])} != {len(events)}"
-            )
+            if n_sig == 0 or n_bkg == 0:
+                raise RuntimeError(
+                    f"Empty class after selection - n_signal={n_sig}, n_background={n_bkg}. "
+                    "Check cuts in config.yaml."
+                )
 
-    LOGGER.info("Wrote %s (%d events)", output, len(events))
+            f.attrs["lumi_fb_inv"] = config.lumi
+            f.attrs["n_signal"] = n_sig
+            f.attrs["n_background"] = n_bkg
+
+        # Validate output - catch silent write failures
+        with h5py.File(tmp_output, "r") as f:
+            if "events" not in f:
+                raise RuntimeError(f"Output validation failed: 'events' missing in {tmp_output}")
+            if f["events"].dtype != OUTPUT_DTYPE:
+                raise RuntimeError(
+                    f"Output validation failed: dtype mismatch in {tmp_output}: "
+                    f"{f['events'].dtype} != {OUTPUT_DTYPE}"
+                )
+            if len(f["events"]) != total_events:
+                raise RuntimeError(
+                    f"Output validation failed: length mismatch in {tmp_output}: "
+                    f"{len(f['events'])} != {total_events}"
+                )
+            actual_sig = 0
+            step = 100_000
+            for start in range(0, total_events, step):
+                actual_sig += int(f["events"]["is_signal"][start : start + step].sum())
+            if actual_sig != n_sig:
+                raise RuntimeError(
+                    f"Output validation failed: n_signal mismatch in {tmp_output}: "
+                    f"data has {actual_sig} but expected {n_sig}"
+                )
+
+        tmp_output.replace(output)
+    except Exception:
+        if tmp_output.exists():
+            tmp_output.unlink()
+        raise
+    LOGGER.info("Wrote %s (%d events)", output, total_events)
 
 
 def main() -> int:
