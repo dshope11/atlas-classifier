@@ -5,7 +5,7 @@
 # rather than in code.
 
 # --- Architecture + training hyperparameters ----------------------------
-# Values below set by Optuna TPE (scripts/tune.py); see logs/tune_loose.log
+# Values below set by Optuna TPE (scripts/tune.py)
 hidden_sizes: [128, 64]
 dropout: 0.102
 input_noise_std: 0.01      # GaussianNoise stddev added to inputs (training only)
