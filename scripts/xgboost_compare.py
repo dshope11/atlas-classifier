@@ -236,7 +236,7 @@ def run_comparison(config: TrainingConfig, n_trials: int) -> None:
 
     # --- Load DNN + score test set ----------------------------------------
     LOGGER.info("Loading DNN checkpoint: %s", config.checkpoint_path)
-    ckpt = torch.load(config.checkpoint_path, weights_only=False)
+    ckpt = torch.load(config.checkpoint_path, weights_only=True)
     dnn_model = HWWClassifier.from_checkpoint(ckpt, config)
     dnn_model.eval()
     dnn_scores = score_dnn(dnn_model, X_test)
