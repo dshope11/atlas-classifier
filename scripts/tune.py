@@ -2,7 +2,10 @@
 
 Drives :func:`src.train.train` programmatically with each trial's hyperparameter
 sample, and optimises validation AUC over architecture, dropout, learning rate,
-and batch size. Per-trial checkpoints and loss history files are written to
+and batch size. Each trial is scored by the val AUC of the epoch whose weights
+the trial checkpoint actually holds (the best-val-loss epoch restored by
+``train()``) - not the max per-epoch val AUC, which can come from an epoch
+whose weights were discarded. Per-trial checkpoints and loss history files are written to
 isolated subdirectories under ``data/processed/tune/`` so trials don't clobber
 each other; after the study completes, the best trial's checkpoint and history
 are promoted to ``config.checkpoint_path`` / ``config.loss_history_path`` so
@@ -29,6 +32,7 @@ from pathlib import Path
 from typing import Any
 
 import optuna
+import torch
 
 from src.config import TrainingConfig, load_config
 from src.train import train
@@ -105,8 +109,16 @@ def objective(trial: optuna.Trial, base_config: TrainingConfig, tune_dir: Path) 
     if not history:
         return float("nan")
 
-    best_auc = max(float(epoch["val_auc"]) for epoch in history)
-    LOGGER.info("Trial %d | val_auc=%.4f", trial.number, best_auc)
+    # Score the weights the checkpoint actually holds: train() restores the
+    # best-val-loss epoch, so the trial value is that epoch's val AUC.
+    ckpt = torch.load(paths["checkpoint_path"], weights_only=True)
+    best_epoch = int(ckpt["best_epoch"])
+    auc_by_epoch = {int(h["epoch"]): float(h["val_auc"]) for h in history}
+    if best_epoch not in auc_by_epoch:
+        LOGGER.warning("Trial %d: checkpoint epoch %d missing from history", trial.number, best_epoch)
+        return float("nan")
+    best_auc = auc_by_epoch[best_epoch]
+    LOGGER.info("Trial %d | val_auc=%.4f (checkpoint epoch %d)", trial.number, best_auc, best_epoch)
     return best_auc
 
 
