@@ -73,11 +73,6 @@ def score_dnn(model: HWWClassifier, X: np.ndarray, batch_size: int = 4096) -> np
     return np.concatenate(out)
 
 
-def _threshold_at_signal_eff(scores_signal: np.ndarray, eff: float) -> float:
-    """Score threshold giving ``eff`` fraction of signal events above it (unweighted)."""
-    return float(np.quantile(scores_signal, 1.0 - eff))
-
-
 # ---------------------------------------------------------------------------
 # Pre-fit plots
 # ---------------------------------------------------------------------------
