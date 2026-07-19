@@ -103,9 +103,11 @@ def asimov_significance(s: float, b: float) -> float:
     tests of new physics", Eur. Phys. J. C 71 (2011) 1554, Eq. 97.
 
     Reduces to S/sqrt(B) in the s << b limit but handles the s ~ b regime correctly.
-    Returns 0 if ``b <= 0`` (no background - significance undefined).
+    Returns 0 if ``b <= 0`` (no background - significance undefined) or ``s <= 0``
+    (no signal excess; negative-weight MC events can drive s below zero at extreme
+    score thresholds, where the log/sqrt would otherwise produce NaN).
     """
-    if b <= 0:
+    if b <= 0 or s <= 0:
         return 0.0
     return float(np.sqrt(2.0 * ((s + b) * np.log(1.0 + s / b) - s)))
 

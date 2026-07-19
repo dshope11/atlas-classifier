@@ -96,7 +96,7 @@ Ten input features per event: five physics-motivated composite kinematic variabl
 
 ![Feature importance: permutation (global AUC drop) and perturbation (local |delta score|)](assets/feature_importance.png)
 
-**Finding: m<sub>ll</sub> dominance.** Permutation importance shows m<sub>ll</sub> dominates by a factor of ~15 over the next feature (+0.374 vs. +0.025 for m<sub>T</sub>). This makes physical sense: a spin-0 Higgs produces collinear leptons with simultaneously small $\Delta\phi_{\ell\ell}$ and small m<sub>ll</sub> - the same physics shows up in both, so once m<sub>ll</sub> is in the network $\Delta\phi_{\ell\ell}$ adds little marginal discriminating information. Verifying that the model's most important feature aligns with the underlying physics is a necessary correctness check; if m<sub>ll</sub> *hadn't* dominated, that would have been the bug to investigate.
+**Finding: m<sub>ll</sub> dominance.** Permutation importance shows m<sub>ll</sub> dominates by a factor of ~15 over the next feature ($+0.373 \pm 0.004$ vs. $+0.024$ for m<sub>T</sub>, mean over 5 independent shuffles). This makes physical sense: a spin-0 Higgs produces collinear leptons with simultaneously small $\Delta\phi_{\ell\ell}$ and small m<sub>ll</sub> - the same physics shows up in both, so once m<sub>ll</sub> is in the network $\Delta\phi_{\ell\ell}$ adds little marginal discriminating information. Verifying that the model's most important feature aligns with the underlying physics is a necessary correctness check; if m<sub>ll</sub> *hadn't* dominated, that would have been the bug to investigate.
 
 ---
 
@@ -176,7 +176,7 @@ $S/\sqrt{B}$ is a small-signal approximation. The Asimov formula $Z = \sqrt{2[(s
 
 ### Two complementary feature-importance methods
 
-Permutation importance (global) shuffles each feature across the test set and measures the AUC drop. Perturbation importance (local) shifts each feature by $\pm 0.01\sigma$ at each event's actual value and measures the mean |delta score|. They measure different things - global discrimination quality vs. local gradient sensitivity - and reporting both makes disagreements interpretable: a feature that ranks high on perturbation but low on permutation suggests sharp local gradients in a region that doesn't contribute much global separation.
+Permutation importance (global) shuffles each feature across the test set and measures the AUC drop, averaged over 5 independent shuffles with the spread reported as error bars. Perturbation importance (local) shifts each feature by $\pm 0.01\sigma$ at each event's actual value and measures the mean |delta score|. They measure different things - global discrimination quality vs. local gradient sensitivity - and reporting both makes disagreements interpretable: a feature that ranks high on perturbation but low on permutation suggests sharp local gradients in a region that doesn't contribute much global separation.
 
 ---
 

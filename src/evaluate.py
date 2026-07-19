@@ -258,18 +258,31 @@ def ks_overtraining(
 
 
 def permutation_importance(
-    model: HWWClassifier, X: np.ndarray, y: np.ndarray, feature_names: list[str], rng: np.random.Generator
-) -> dict[str, float]:
-    """Per-feature AUC drop after shuffling that feature's values across the test set."""
+    model: HWWClassifier,
+    X: np.ndarray,
+    y: np.ndarray,
+    feature_names: list[str],
+    rng: np.random.Generator,
+    n_repeats: int = 5,
+) -> dict[str, tuple[float, float]]:
+    """Per-feature AUC drop after shuffling that feature's values across the test set.
+
+    Each feature is shuffled ``n_repeats`` times with independent permutations.
+    Returns ``{name: (mean AUC drop, std)}`` so the shuffle noise is reported
+    as an error bar instead of being baked invisibly into a single draw.
+    """
     base_scores = score_dnn(model, X)
     base_auc = float(auc(*roc_curve(y, base_scores)[:2]))
-    drops: dict[str, float] = {}
+    drops: dict[str, tuple[float, float]] = {}
     for i, name in enumerate(feature_names):
-        X_shuf = X.copy()
-        X_shuf[:, i] = rng.permutation(X_shuf[:, i])
-        scores = score_dnn(model, X_shuf)
-        shuf_auc = float(auc(*roc_curve(y, scores)[:2]))
-        drops[name] = base_auc - shuf_auc
+        rep_drops = []
+        for _ in range(n_repeats):
+            X_shuf = X.copy()
+            X_shuf[:, i] = rng.permutation(X_shuf[:, i])
+            scores = score_dnn(model, X_shuf)
+            shuf_auc = float(auc(*roc_curve(y, scores)[:2]))
+            rep_drops.append(base_auc - shuf_auc)
+        drops[name] = (float(np.mean(rep_drops)), float(np.std(rep_drops)))
     return drops
 
 
@@ -298,15 +311,16 @@ def perturbation_importance(
 
 
 def plot_importance(
-    permutation: dict[str, float], perturbation: dict[str, float], out_path: Path
+    permutation: dict[str, tuple[float, float]], perturbation: dict[str, float], out_path: Path
 ) -> None:
     names = list(permutation.keys())
-    perm = [permutation[n] for n in names]
+    perm = [permutation[n][0] for n in names]
+    perm_err = [permutation[n][1] for n in names]
     pert = [perturbation[n] for n in names]
     y_pos = np.arange(len(names))
 
     fig, axes = plt.subplots(1, 2, figsize=(11, 0.5 * len(names) + 2))
-    axes[0].barh(y_pos, perm, color="C0")
+    axes[0].barh(y_pos, perm, xerr=perm_err, color="C0", ecolor="k", capsize=3)
     axes[0].set_yticks(y_pos)
     axes[0].set_yticklabels(names)
     axes[0].invert_yaxis()
@@ -591,9 +605,9 @@ def run_evaluation(config: TrainingConfig) -> None:
         scan.cut_matched.z, scan.cut_matched.threshold, scan.cut_matched.tpr, scan.cut_matched.fpr, scan.cut_matched.s, scan.cut_matched.b,
     )
     LOGGER.info("dZ (cut-TPR - cut-based):        %+.3f", scan.cut_matched.z - z_cut)
-    LOGGER.info("Permutation importance (sorted):")
-    for name, val in sorted(perm.items(), key=lambda kv: -kv[1]):
-        LOGGER.info("    %-15s  %+.4f", name, val)
+    LOGGER.info("Permutation importance (sorted, mean +/- std over shuffles):")
+    for name, (mean_drop, std_drop) in sorted(perm.items(), key=lambda kv: -kv[1][0]):
+        LOGGER.info("    %-15s  %+.4f +/- %.4f", name, mean_drop, std_drop)
     LOGGER.info("Perturbation importance (sorted):")
     for name, val in sorted(pert.items(), key=lambda kv: -kv[1]):
         LOGGER.info("    %-15s  %.4f", name, val)

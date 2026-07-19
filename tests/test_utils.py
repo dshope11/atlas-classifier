@@ -42,6 +42,18 @@ def test_asimov_monotonic_in_signal() -> None:
     assert all(zs[i] < zs[i + 1] for i in range(len(zs) - 1))
 
 
+def test_asimov_returns_zero_when_no_signal() -> None:
+    assert asimov_significance(0.0, 100.0) == 0.0
+
+
+def test_asimov_negative_signal_returns_zero_not_nan() -> None:
+    """Negative-weight MC events can drive s < 0 at extreme thresholds - the
+    guard must return 0.0 instead of letting log/sqrt produce NaN."""
+    z = asimov_significance(-3.0, 100.0)
+    assert z == 0.0
+    assert not np.isnan(z)
+
+
 # ---------------------------------------------------------------------------
 # compute_yields
 # ---------------------------------------------------------------------------

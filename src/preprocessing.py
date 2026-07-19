@@ -22,9 +22,9 @@ a feature requires only extending :data:`FEATURE_FNS` and reprocessing):
 ================  ===================================================
 
 The 3-way split fractions and random seed live in ``TrainingConfig``.
-``StratifiedShuffleSplit`` ensures ``is_signal`` proportions are preserved
-in train/val/test - important because plain random shuffle can drift on
-small classes.
+Two chained ``train_test_split(..., stratify=...)`` calls preserve the
+``is_signal`` proportions in train/val/test - important because plain
+random shuffle can drift on small classes.
 """
 
 from __future__ import annotations
