@@ -32,12 +32,9 @@ import h5py
 import numpy as np
 import uproot
 
-# Make src.* importable when this module is run as a script
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src.config import TrainingConfig, load_config  # noqa: E402
-from src.sample_info import SAMPLES, SampleInfo  # noqa: E402
-from src.utils import chronomat, evaluate_cuts, print_timings, setup_logging  # noqa: E402
+from src.config import TrainingConfig, load_config
+from src.sample_info import SAMPLES, SampleInfo
+from src.utils import chronomat, evaluate_cuts, print_timings, setup_logging
 
 LOGGER = logging.getLogger(Path(__file__).stem)
 

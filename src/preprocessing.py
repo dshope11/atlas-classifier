@@ -39,11 +39,8 @@ import h5py
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-# Make src.* importable when this module is run as a script
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src.config import Features, Labels, TrainingConfig, Weights, load_config  # noqa: E402
-from src.utils import chronomat, print_timings, setup_logging  # noqa: E402
+from src.config import Features, Labels, TrainingConfig, Weights, load_config
+from src.utils import chronomat, print_timings, setup_logging
 
 LOGGER = logging.getLogger(Path(__file__).stem)
 

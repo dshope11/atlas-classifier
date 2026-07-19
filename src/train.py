@@ -31,13 +31,10 @@ from sklearn.metrics import roc_auc_score
 from torch import Tensor, nn, optim
 from torch.utils.data import DataLoader, TensorDataset
 
-# Make src.* importable when this module is run as a script
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src.config import TrainingConfig, load_config  # noqa: E402
-from src.model import HWWClassifier  # noqa: E402
-from src.preprocessing import load_split  # noqa: E402
-from src.utils import asimov_significance, chronomat, print_timings, setup_logging  # noqa: E402
+from src.config import TrainingConfig, load_config
+from src.model import HWWClassifier
+from src.preprocessing import load_split
+from src.utils import asimov_significance, chronomat, print_timings, setup_logging
 
 LOGGER = logging.getLogger(Path(__file__).stem)
 

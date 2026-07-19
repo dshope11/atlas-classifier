@@ -42,8 +42,6 @@ import torch  # noqa: E402
 import xgboost as xgb  # noqa: E402
 from sklearn.metrics import auc, roc_auc_score, roc_curve  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from src.config import TrainingConfig, load_config  # noqa: E402
 from src.evaluate import cut_baseline_metrics, scan_thresholds, score_dnn  # noqa: E402
 from src.model import HWWClassifier  # noqa: E402

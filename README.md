@@ -189,8 +189,10 @@ The pipeline runs end-to-end in roughly 10 minutes on Apple Silicon (~5 min down
 ```bash
 conda create -n atlas-classifier python=3.12 -y
 conda activate atlas-classifier
-pip install -r requirements.txt
+pip install -e .
 ```
+
+The editable install makes `src` importable from anywhere (no path hacks); dependencies are pulled from `requirements.txt` (exact pins) via the project metadata.
 
 PyTorch's MPS backend is used automatically on Apple Silicon; CUDA if available; otherwise CPU.
 

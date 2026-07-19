@@ -40,13 +40,10 @@ import torch
 from scipy.stats import ks_2samp
 from sklearn.metrics import auc, roc_curve
 
-# Make src.* importable when this module is run as a script
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src.config import TrainingConfig, load_config  # noqa: E402
-from src.model import HWWClassifier  # noqa: E402
-from src.preprocessing import load_split  # noqa: E402
-from src.utils import (  # noqa: E402
+from src.config import TrainingConfig, load_config
+from src.model import HWWClassifier
+from src.preprocessing import load_split
+from src.utils import (
     asimov_significance,
     chronomat,
     clopper_pearson,

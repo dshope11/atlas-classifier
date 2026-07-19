@@ -58,6 +58,7 @@ atlas-classifier/
     raw/            ← ROOT files (gitignored)
     processed/      ← HDF5 + checkpoint + plots (gitignored)
   logs/             ← training.log, tune.log, xgboost_compare.log (appended)
+  pyproject.toml    ← packaging (pip install -e .); deps dynamic from requirements.txt
   requirements.txt
   CLAUDE.md
 ```

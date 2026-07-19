@@ -30,12 +30,9 @@ from typing import Any
 
 import optuna
 
-# Make src.* importable when running as a script
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src.config import TrainingConfig, load_config  # noqa: E402
-from src.train import train  # noqa: E402
-from src.utils import setup_logging  # noqa: E402
+from src.config import TrainingConfig, load_config
+from src.train import train
+from src.utils import setup_logging
 
 LOGGER = logging.getLogger(Path(__file__).stem)
 

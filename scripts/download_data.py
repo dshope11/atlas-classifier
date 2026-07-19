@@ -22,10 +22,7 @@ import atlasopenmagic as atom
 import requests
 from tqdm import tqdm
 
-# Make src.* importable when running as a script
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src.sample_info import (  # noqa: E402
+from src.sample_info import (
     ATLAS_OPENDATA_RELEASE,
     ATLAS_OPENDATA_SKIM,
     SAMPLES,

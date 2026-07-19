@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atlas-classifier"
+version = "1.0.0"
+description = "End-to-end signal/background classifier for ATLAS Open Data H->WW events"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+# Dependencies live in requirements.txt (exact pins, single source of truth);
+# pip install -e . reads them from there.
+dynamic = ["dependencies"]
+
+[tool.setuptools]
+packages = ["src"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
