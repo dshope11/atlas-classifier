@@ -62,14 +62,11 @@ LOGGER = logging.getLogger(Path(__file__).stem)
 
 
 def score_dnn(model: HWWClassifier, X: np.ndarray, batch_size: int = 4096) -> np.ndarray:
-    """Return p(signal) for every row of ``X`` in eval mode (PyTorch / HWWClassifier)."""
-    model.eval()
+    """Return p(signal) for every row of ``X`` via ``model.predict_proba`` (batched)."""
     out: list[np.ndarray] = []
-    with torch.no_grad():
-        for start in range(0, len(X), batch_size):
-            batch = torch.from_numpy(X[start : start + batch_size]).float()
-            logits = model(batch).cpu().numpy().flatten()
-            out.append(1.0 / (1.0 + np.exp(-logits)))
+    for start in range(0, len(X), batch_size):
+        batch = torch.from_numpy(X[start : start + batch_size]).float()
+        out.append(model.predict_proba(batch).cpu().numpy().flatten())
     return np.concatenate(out)
 
 
