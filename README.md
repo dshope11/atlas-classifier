@@ -180,7 +180,7 @@ Permutation importance (global) shuffles each feature across the test set and me
 
 ## Reproducing the results
 
-The pipeline runs end-to-end in well under 10 minutes on Apple Silicon (~5 min download, ~5 min training, everything else in seconds).
+The pipeline runs end-to-end in roughly 10 minutes on Apple Silicon (~5 min download, ~5 min training, everything else in seconds).
 
 ### 1. Set up the Python environment
 
@@ -288,7 +288,7 @@ atlas-classifier/
 
 ---
 
-## Scope of v1
+## Scope and limitations
 
 Out-of-scope by design:
 
