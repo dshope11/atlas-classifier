@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # CPU-only torch: the default Linux wheel bundles CUDA libraries (several GB)
+      # that CI does not need. Must install before requirements.txt so pip sees
+      # torch==2.11.0 already satisfied.
+      - name: Install CPU-only torch
+        run: pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint (ruff)
+        run: ruff check src/ scripts/ tests/
+
+      - name: Type-check (mypy)
+        run: mypy src/ scripts/ --ignore-missing-imports
+
+      - name: Test (pytest)
+        run: pytest tests/ -q

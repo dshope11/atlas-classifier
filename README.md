@@ -1,5 +1,7 @@
 # atlas-classifier
 
+[![CI](https://github.com/dshope11/atlas-classifier/actions/workflows/ci.yml/badge.svg)](https://github.com/dshope11/atlas-classifier/actions/workflows/ci.yml)
+
 `PyTorch | XGBoost | Optuna | uproot/awkward | scikit-learn | pytest`
 
 This is a rare-event classification problem: an expected ~1,600 weighted signal events against ~31,000 background, with no single measured quantity that separates the two. The project builds and evaluates a classifier for that problem end-to-end, and quantifies the payoff the way particle physics does - as a calibrated statistical significance against a hand-tuned baseline.
