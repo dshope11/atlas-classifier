@@ -49,11 +49,13 @@ def _select_device() -> torch.device:
 
 
 def _make_loader(
-    X: np.ndarray, y: np.ndarray, batch_size: int, shuffle: bool
+    X: np.ndarray, y: np.ndarray, batch_size: int, shuffle: bool, drop_last: bool = False
 ) -> DataLoader:
     X_t = torch.from_numpy(X).float()
     y_t = torch.from_numpy(y).float().unsqueeze(1)
-    return DataLoader(TensorDataset(X_t, y_t), batch_size=batch_size, shuffle=shuffle)
+    return DataLoader(
+        TensorDataset(X_t, y_t), batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+    )
 
 
 def _val_pass(
@@ -143,7 +145,8 @@ def train(config: TrainingConfig) -> None:
         optimizer, mode="min", factor=config.lr_factor, patience=config.lr_patience
     )
 
-    train_loader = _make_loader(X_train, y_train, config.batch_size, shuffle=True)
+    # drop_last: BatchNorm1d in train mode raises on a final batch of size 1
+    train_loader = _make_loader(X_train, y_train, config.batch_size, shuffle=True, drop_last=True)
     val_loader = _make_loader(X_val, y_val, config.batch_size * 4, shuffle=False)
     LOGGER.info(
         "Loaders ready  train_batches=%d  val_batches=%d",
