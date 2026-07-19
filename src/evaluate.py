@@ -16,7 +16,9 @@ Outputs (all written under ``config.output_dir`` as PNGs + a printed summary):
   +/-0.01sigma) side by side; disagreement is interpretable
 
 **Printed summary**: AUC, KS overtraining check (p-values), cut-based and DNN
-Asimov significance at the working point.
+Asimov significance. Threshold protocol: the operating threshold is selected on
+the val split, frozen, and evaluated on the test split; the test-argmax value
+is logged only as an explicitly labeled biased "oracle" upper bound.
 
 All yields/significance use full physics weights ``event_weight``. ROC and
 KS are unweighted (measure the discriminator quality / shape match, not yields).
@@ -27,6 +29,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
@@ -363,52 +366,125 @@ def cut_baseline_metrics(
 
 
 # ---------------------------------------------------------------------------
-# Threshold scan
+# Threshold selection (val) + reporting (test)
 # ---------------------------------------------------------------------------
 
 
-def scan_thresholds(
-    scores: np.ndarray, y: np.ndarray, w: np.ndarray, cut_tpr: float, z_cut: float,
-    label: str = "Model",
-) -> tuple[float, float, float, float, float, float, float, float, float, float]:
-    """Scan all ROC thresholds for optimal Asimov Z and cut-TPR-matched Z.
+@dataclass(frozen=True)
+class ThresholdReport:
+    """Metrics for one operating point, evaluated on the reporting split.
 
-    ``label`` is used as the prefix in the two log lines (e.g. "DNN", "XGBoost")
-    so the same scan can be reused across different classifiers without
-    misattributing results.
-
-    Returns (z_opt, tpr_opt, fpr_opt, s_opt, b_opt,
-             z_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr).
+    ``tpr``/``fpr`` are unweighted event fractions; ``s``/``b`` are
+    ``event_weight``-weighted yields and ``z`` the Asimov significance of those
+    yields.
     """
-    fpr_vals, tpr_vals, score_thresholds = roc_curve(y, scores)
+
+    threshold: float
+    z: float
+    tpr: float
+    fpr: float
+    s: float
+    b: float
+
+
+@dataclass(frozen=True)
+class ScanResults:
+    """Operating-point rows produced by :func:`scan_thresholds`.
+
+    - ``frozen``: Asimov-optimal threshold selected on the selection (val)
+      split, evaluated on the reporting (test) split. The headline number.
+    - ``oracle``: threshold re-selected on the reporting split itself.
+      Optimistically biased upper bound (the argmax over ~20k thresholds of a
+      noisy weighted-yield curve rides upward fluctuations); reported only to
+      display the size of the selection bias, never as a result.
+    - ``cut_matched``: threshold whose selection-split TPR matches the
+      cut-based baseline's TPR, evaluated on the reporting split.
+    """
+
+    frozen: ThresholdReport
+    oracle: ThresholdReport
+    cut_matched: ThresholdReport
+
+
+def _report_at(
+    scores: np.ndarray, y: np.ndarray, w: np.ndarray, threshold: float
+) -> ThresholdReport:
+    """Evaluate all operating-point metrics at a fixed, already-chosen threshold."""
+    s, b = compute_yields(scores, y, w, threshold)
+    pass_mask = scores >= threshold
+    sig_mask = y == 1
+    bkg_mask = y == 0
+    tpr = float((pass_mask & sig_mask).sum() / sig_mask.sum()) if sig_mask.any() else 0.0
+    fpr = float((pass_mask & bkg_mask).sum() / bkg_mask.sum()) if bkg_mask.any() else 0.0
+    return ThresholdReport(
+        threshold=float(threshold), z=asimov_significance(s, b),
+        tpr=tpr, fpr=fpr, s=s, b=b,
+    )
+
+
+def select_threshold(
+    scores_sel: np.ndarray, y_sel: np.ndarray, w_sel: np.ndarray
+) -> float:
+    """Asimov-optimal score threshold, selected on a held-out selection split.
+
+    Scans every ROC threshold of the selection split and returns the argmax of
+    the Asimov Z. The threshold is a tuned hyperparameter: it must be frozen
+    and evaluated on an untouched split. Quoting the Z it achieves on the
+    split it was selected on is optimistically biased.
+    """
+    _, _, score_thresholds = roc_curve(y_sel, scores_sel)
     z_scan = np.array([
-        asimov_significance(*compute_yields(scores, y, w, float(t)))
+        asimov_significance(*compute_yields(scores_sel, y_sel, w_sel, float(t)))
         for t in score_thresholds
     ])
+    return float(score_thresholds[int(np.argmax(z_scan))])
 
-    opt_idx = int(np.argmax(z_scan))
-    threshold_opt = float(score_thresholds[opt_idx])
-    s_opt, b_opt = compute_yields(scores, y, w, threshold_opt)
-    z_opt = float(z_scan[opt_idx])
-    tpr_opt = float(tpr_vals[opt_idx])
-    fpr_opt = float(fpr_vals[opt_idx])
+
+def _threshold_at_tpr(
+    scores_sel: np.ndarray, y_sel: np.ndarray, target_tpr: float
+) -> float:
+    """Score threshold whose selection-split TPR is closest to ``target_tpr``."""
+    _, tpr_vals, score_thresholds = roc_curve(y_sel, scores_sel)
+    return float(score_thresholds[int(np.argmin(np.abs(tpr_vals - target_tpr)))])
+
+
+def scan_thresholds(
+    scores_sel: np.ndarray, y_sel: np.ndarray, w_sel: np.ndarray,
+    scores_rep: np.ndarray, y_rep: np.ndarray, w_rep: np.ndarray,
+    cut_tpr: float, z_cut: float,
+    label: str = "Model",
+) -> ScanResults:
+    """Select operating thresholds on the selection split, report on the reporting split.
+
+    ``scores_sel``/``y_sel``/``w_sel`` are the selection (val) split used only
+    to choose thresholds; ``scores_rep``/``y_rep``/``w_rep`` are the reporting
+    (test) split every returned metric is evaluated on. See :class:`ScanResults`
+    for the three rows. ``label`` prefixes the log lines (e.g. "DNN",
+    "XGBoost") so the scan can be reused across classifiers.
+    """
+    thr_frozen = select_threshold(scores_sel, y_sel, w_sel)
+    frozen = _report_at(scores_rep, y_rep, w_rep, thr_frozen)
     LOGGER.info(
-        "%s @ optimal threshold (threshold=%.4f): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f  (gain over cut-based: %+.3f)",
-        label, threshold_opt, tpr_opt, fpr_opt, s_opt, b_opt, z_opt, z_opt - z_cut,
+        "%s @ frozen val-selected threshold (threshold=%.4f): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f  (gain over cut-based: %+.3f)",
+        label, frozen.threshold, frozen.tpr, frozen.fpr, frozen.s, frozen.b, frozen.z, frozen.z - z_cut,
     )
 
-    cut_match_idx = int(np.argmin(np.abs(tpr_vals - cut_tpr)))
-    threshold_cut_tpr = float(score_thresholds[cut_match_idx])
-    tpr_matched = float(tpr_vals[cut_match_idx])
-    fpr_matched = float(fpr_vals[cut_match_idx])
-    s_cut_tpr, b_cut_tpr = compute_yields(scores, y, w, threshold_cut_tpr)
-    z_cut_tpr = asimov_significance(s_cut_tpr, b_cut_tpr)
+    thr_oracle = select_threshold(scores_rep, y_rep, w_rep)
+    oracle = _report_at(scores_rep, y_rep, w_rep, thr_oracle)
     LOGGER.info(
-        "%s @ cut-based TPR (threshold=%.4f): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f  (gain over cut-based: %+.3f)",
-        label, threshold_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr, z_cut_tpr, z_cut_tpr - z_cut,
+        "%s @ oracle threshold (selected on the reporting split -- biased upper bound, not a result) "
+        "(threshold=%.4f): Z=%.3f  (selection bias vs frozen: %+.3f)",
+        label, oracle.threshold, oracle.z, oracle.z - frozen.z,
     )
 
-    return z_opt, tpr_opt, fpr_opt, s_opt, b_opt, z_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr
+    thr_cut = _threshold_at_tpr(scores_sel, y_sel, cut_tpr)
+    cut_matched = _report_at(scores_rep, y_rep, w_rep, thr_cut)
+    LOGGER.info(
+        "%s @ cut-based TPR (threshold=%.4f, matched on val): TPR=%.4f  FPR=%.4f  s=%.3f  b=%.3f  Z=%.3f  (gain over cut-based: %+.3f)",
+        label, cut_matched.threshold, cut_matched.tpr, cut_matched.fpr, cut_matched.s, cut_matched.b, cut_matched.z, cut_matched.z - z_cut,
+    )
+
+    return ScanResults(frozen=frozen, oracle=oracle, cut_matched=cut_matched)
 
 
 # ---------------------------------------------------------------------------
@@ -429,6 +505,9 @@ def run_evaluation(config: TrainingConfig) -> None:
     X_train = cast(np.ndarray, split["X_train"])
     y_train = cast(np.ndarray, split["y_train"])
     w_train = cast(np.ndarray, split["w_train"])
+    X_val = cast(np.ndarray, split["X_val"])
+    y_val = cast(np.ndarray, split["y_val"])
+    w_val = cast(np.ndarray, split["w_val"])
     X_test = cast(np.ndarray, split["X_test"])
     y_test = cast(np.ndarray, split["y_test"])
     w_test = cast(np.ndarray, split["w_test"])
@@ -453,8 +532,9 @@ def run_evaluation(config: TrainingConfig) -> None:
             f"but split has {feature_names}"
         )
 
-    # --- Score train / test -------------------------------------------
+    # --- Score train / val / test -------------------------------------
     scores_train = score_dnn(model, X_train)
+    scores_val = score_dnn(model, X_val)
     scores_test = score_dnn(model, X_test)
 
     # --- Cut-based baseline ------------------------------------------
@@ -467,9 +547,11 @@ def run_evaluation(config: TrainingConfig) -> None:
         cut_tpr, cut_fpr, s_cut, b_cut, z_cut,
     )
 
-    # --- Threshold scan: optimal Z and cut-TPR match -----------------
-    z_opt, tpr_opt, fpr_opt, s_opt, b_opt, z_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr = (
-        scan_thresholds(scores_test, y_test, w_test, cut_tpr, z_cut, label="DNN")
+    # --- Threshold scan: select on val, report on test ---------------
+    scan = scan_thresholds(
+        scores_val, y_val, w_val,
+        scores_test, y_test, w_test,
+        cut_tpr, z_cut, label="DNN",
     )
 
     # --- ROC + score distributions + KS -------------------------------
@@ -506,10 +588,20 @@ def run_evaluation(config: TrainingConfig) -> None:
                 ks_results["background_ks"], ks_results["background_p"],
                 "OK" if ks_results["background_p"] >= 0.05 else "FLAGGED")
     LOGGER.info("Cut-based  Z:                     %.3f  (s=%.2f  b=%.2f)", z_cut, s_cut, b_cut)
-    LOGGER.info("DNN @ opt  Z:                     %.3f  (TPR=%.4f  FPR=%.4f  s=%.2f  b=%.2f)", z_opt, tpr_opt, fpr_opt, s_opt, b_opt)
-    LOGGER.info("dZ (opt - cut-based):            %+.3f", z_opt - z_cut)
-    LOGGER.info("DNN @ cut-TPR Z:                  %.3f  (TPR=%.4f  FPR=%.4f  s=%.2f  b=%.2f)", z_cut_tpr, tpr_matched, fpr_matched, s_cut_tpr, b_cut_tpr)
-    LOGGER.info("dZ (cut-TPR - cut-based):        %+.3f", z_cut_tpr - z_cut)
+    LOGGER.info(
+        "DNN @ frozen val thr Z:           %.3f  (thr=%.4f  TPR=%.4f  FPR=%.4f  s=%.2f  b=%.2f)",
+        scan.frozen.z, scan.frozen.threshold, scan.frozen.tpr, scan.frozen.fpr, scan.frozen.s, scan.frozen.b,
+    )
+    LOGGER.info("dZ (frozen - cut-based):         %+.3f", scan.frozen.z - z_cut)
+    LOGGER.info(
+        "DNN @ oracle thr Z (biased UB):   %.3f  (selection bias vs frozen: %+.3f; not a result)",
+        scan.oracle.z, scan.oracle.z - scan.frozen.z,
+    )
+    LOGGER.info(
+        "DNN @ cut-TPR Z:                  %.3f  (thr=%.4f  TPR=%.4f  FPR=%.4f  s=%.2f  b=%.2f)",
+        scan.cut_matched.z, scan.cut_matched.threshold, scan.cut_matched.tpr, scan.cut_matched.fpr, scan.cut_matched.s, scan.cut_matched.b,
+    )
+    LOGGER.info("dZ (cut-TPR - cut-based):        %+.3f", scan.cut_matched.z - z_cut)
     LOGGER.info("Permutation importance (sorted):")
     for name, val in sorted(perm.items(), key=lambda kv: -kv[1]):
         LOGGER.info("    %-15s  %+.4f", name, val)

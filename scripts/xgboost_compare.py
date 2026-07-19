@@ -180,6 +180,7 @@ def run_comparison(config: TrainingConfig, n_trials: int) -> None:
     y_train = cast(np.ndarray, split["y_train"])
     X_val   = cast(np.ndarray, split["X_val"])
     y_val   = cast(np.ndarray, split["y_val"])
+    w_val   = cast(np.ndarray, split["w_val"])
     X_test  = cast(np.ndarray, split["X_test"])
     y_test  = cast(np.ndarray, split["y_test"])
     w_test  = cast(np.ndarray, split["w_test"])
@@ -231,29 +232,31 @@ def run_comparison(config: TrainingConfig, n_trials: int) -> None:
         display = feature_names[fidx] if 0 <= fidx < len(feature_names) else fname
         LOGGER.info("    %-15s  %.4f", display, importance[fname] / total)
 
-    # --- Score test set ---------------------------------------------------
+    # --- Score val + test sets --------------------------------------------
+    xgb_val_scores = clf.predict_proba(X_val)[:, 1]
     xgb_scores = clf.predict_proba(X_test)[:, 1]
 
-    # --- Load DNN + score test set ----------------------------------------
+    # --- Load DNN + score val + test sets ---------------------------------
     LOGGER.info("Loading DNN checkpoint: %s", config.checkpoint_path)
     ckpt = torch.load(config.checkpoint_path, weights_only=True)
     dnn_model = HWWClassifier.from_checkpoint(ckpt, config)
     dnn_model.eval()
+    dnn_val_scores = score_dnn(dnn_model, X_val)
     dnn_scores = score_dnn(dnn_model, X_test)
     dnn_test_auc = float(auc(*roc_curve(y_test, dnn_scores)[:2]))
     LOGGER.info("DNN test_auc=%.4f", dnn_test_auc)
 
-    # --- Threshold scans --------------------------------------------------
-    (xgb_z_opt, xgb_tpr_opt, xgb_fpr_opt, xgb_s_opt, xgb_b_opt,
-     xgb_z_cut_tpr, xgb_tpr_matched, xgb_fpr_matched,
-     xgb_s_cut_tpr, xgb_b_cut_tpr) = scan_thresholds(
-        xgb_scores, y_test, w_test, cut_tpr, z_cut, label="XGBoost",
+    # --- Threshold scans: select on val, report on test -------------------
+    xgb_scan = scan_thresholds(
+        xgb_val_scores, y_val, w_val,
+        xgb_scores, y_test, w_test,
+        cut_tpr, z_cut, label="XGBoost",
     )
 
-    (dnn_z_opt, dnn_tpr_opt, dnn_fpr_opt, dnn_s_opt, dnn_b_opt,
-     dnn_z_cut_tpr, dnn_tpr_matched, dnn_fpr_matched,
-     dnn_s_cut_tpr, dnn_b_cut_tpr) = scan_thresholds(
-        dnn_scores, y_test, w_test, cut_tpr, z_cut, label="DNN",
+    dnn_scan = scan_thresholds(
+        dnn_val_scores, y_val, w_val,
+        dnn_scores, y_test, w_test,
+        cut_tpr, z_cut, label="DNN",
     )
 
     # --- Comparison ROC plot ----------------------------------------------
@@ -268,12 +271,14 @@ def run_comparison(config: TrainingConfig, n_trials: int) -> None:
     LOGGER.info("=" * 70)
     LOGGER.info("Cut-based  Z: %.3f  (s=%.2f  b=%.2f)", z_cut, s_cut, b_cut)
     LOGGER.info(
-        "DNN        AUC: %.4f  Z @ opt: %.3f  (dZ=%+.3f)  Z @ cut-TPR: %.3f  (dZ=%+.3f)",
-        dnn_auc, dnn_z_opt, dnn_z_opt - z_cut, dnn_z_cut_tpr, dnn_z_cut_tpr - z_cut,
+        "DNN        AUC: %.4f  Z @ frozen val thr: %.3f  (dZ=%+.3f)  Z @ cut-TPR: %.3f  (dZ=%+.3f)",
+        dnn_auc, dnn_scan.frozen.z, dnn_scan.frozen.z - z_cut,
+        dnn_scan.cut_matched.z, dnn_scan.cut_matched.z - z_cut,
     )
     LOGGER.info(
-        "XGBoost    AUC: %.4f  Z @ opt: %.3f  (dZ=%+.3f)  Z @ cut-TPR: %.3f  (dZ=%+.3f)",
-        xgb_auc, xgb_z_opt, xgb_z_opt - z_cut, xgb_z_cut_tpr, xgb_z_cut_tpr - z_cut,
+        "XGBoost    AUC: %.4f  Z @ frozen val thr: %.3f  (dZ=%+.3f)  Z @ cut-TPR: %.3f  (dZ=%+.3f)",
+        xgb_auc, xgb_scan.frozen.z, xgb_scan.frozen.z - z_cut,
+        xgb_scan.cut_matched.z, xgb_scan.cut_matched.z - z_cut,
     )
     LOGGER.info("Plots written to: %s", out_dir)
 
