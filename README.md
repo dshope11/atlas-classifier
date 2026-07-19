@@ -2,9 +2,19 @@
 
 `PyTorch | XGBoost | Optuna | uproot/awkward | scikit-learn | pytest`
 
-End-to-end binary classifier for **ATLAS Open Data $H\to WW\to 2\ell\nu\nu$** events in the 0-jet category. The 0-jet signal region has no reconstructable invariant mass (two neutrinos in the final state), so the classifier *is* the analysis selection - not a supporting filter on top of one. The goal is a measurable improvement over a hand-crafted cut-based baseline, validated across two independent model families (PyTorch DNN and XGBoost).
+This is a rare-event classification problem: an expected ~1,600 weighted signal events against ~31,000 background, with no single measured quantity that separates the two. The project builds and evaluates a classifier for that problem end-to-end, and quantifies the payoff the way particle physics does - as a calibrated statistical significance against a hand-tuned baseline.
+
+Concretely: an end-to-end binary classifier for **ATLAS Open Data $H\to WW\to 2\ell\nu\nu$** events in the 0-jet category. The 0-jet signal region has no reconstructable invariant mass (two neutrinos in the final state), so the classifier *is* the analysis selection - not a supporting filter on top of one. The goal is a measurable improvement over a hand-crafted cut-based baseline, validated across two independent model families (PyTorch DNN and XGBoost).
 
 The pipeline goes from ATLAS Open Data ROOT ntuples -> engineered physics features -> trained classifier -> quantitative significance comparison vs. the cut-based baseline, with full evaluation diagnostics: ROC with binomial confidence bands, KS overtraining check, weighted score distributions, and two complementary feature-importance methods.
+
+**What this demonstrates:**
+
+- **Data engineering** - a streaming pipeline from a binary scientific format (ROOT ntuples read in 100 MB chunks, so inputs larger than RAM are handled) into HDF5 and PyTorch.
+- **Leakage-safe preprocessing** - normalisation stats are fit on the training split only and shipped inside the model checkpoint, so inference can never see differently-scaled inputs.
+- **Systematic hyperparameter optimisation** - Optuna TPE search, run independently for the DNN and the XGBoost benchmark.
+- **Evaluation methodology** - overtraining checks, binomial confidence bands on the ROC, two feature-importance methods, and a leakage-free threshold-selection protocol (selected on validation, frozen, evaluated once on test).
+- **Engineering hygiene** - typed (mypy), linted (ruff), and covered by a pytest suite.
 
 > Developed using Claude Code; `CLAUDE.md` contains the technical context file for AI-assisted sessions.
 
@@ -117,6 +127,22 @@ Ten input features per event: five physics-motivated composite kinematic variabl
 | `data/processed/events.h5` | `data_loading.py` | Selected events as flat per-event scalars + `event_weight` + `is_signal`. Composite features are *not* stored here. |
 | `data/processed/split.h5` | `preprocessing.py` | Raw feature matrix, labels, and weights for each split + train-only scaler stats |
 | `data/processed/best_model.pt` | `train.py` | Weights + in-model normalisation (`register_buffer`) + feature schema. Self-describing for inference. |
+
+### Using the trained model
+
+The checkpoint is fully self-describing - weights, architecture, normalisation stats, and feature schema in one file - so inference needs no sidecar files (run from the repo root):
+
+```python
+import torch
+from src.config import load_config
+from src.model import HWWClassifier
+
+ckpt = torch.load("data/processed/best_model.pt", weights_only=True)
+model = HWWClassifier.from_checkpoint(ckpt, load_config("config.yaml"))
+p_signal = model.predict_proba(X)  # X: float32 tensor (n_events, 10), raw un-normalised features
+```
+
+Normalisation happens inside `forward()`, so `X` is the raw feature matrix as stored in `split.h5`.
 
 ---
 
@@ -271,4 +297,12 @@ Out-of-scope by design:
 - **Real collision data.** ATLAS Open Data includes real pp collision data alongside the MC, but this pipeline trains and evaluates on MC only. Significance is computed entirely from MC yields using the Asimov approximation (treating the MC prediction as a stand-in for data) - standard practice for feasibility studies and classifier development before unblinding.
 - **Backgrounds beyond WW + ttbar.** $Z\to\tau\tau$ contributes ~1% in the 0-jet region after full selection per the Run 2 paper; data-driven fakes are not included.
 
+**Negative MC weights.** 2.97% of events (2,158 of 72,635, mostly the NLO Sherpa WW sample; 86 signal / 2,072 background) carry a negative `event_weight` - standard for NLO generators. They never enter the training loss, which uses counts-based class balancing with no physics weights, and they are included with their signs in all yields and significance estimates.
+
 **On comparability with the Run 2 legacy analysis.** The results here are not directly comparable to [arXiv:2504.07686](https://arxiv.org/abs/2504.07686): this pipeline uses a simplified Open-Data MC tier (no systematics, no NF/CRs), a simpler statistical treatment (Asimov counting at a val-selected, frozen score threshold vs. profile-likelihood shape fit on the DNN score), a restricted background palette, and a looser preselection. The aim of this repository is to demonstrate end-to-end ML pipeline capability and the Neyman-Pearson improvement over hand-crafted cuts on a real HEP topology - not to reproduce the published result.
+
+---
+
+## License
+
+MIT - see [LICENSE](LICENSE).
