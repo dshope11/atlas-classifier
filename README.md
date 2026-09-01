@@ -18,7 +18,9 @@ The pipeline goes from ATLAS Open Data ROOT ntuples -> engineered physics featur
 - **Evaluation methodology** - overtraining checks, binomial confidence bands on the ROC, two feature-importance methods, and a leakage-free threshold-selection protocol (selected on validation, frozen, evaluated once on test).
 - **Engineering hygiene** - typed (mypy), linted (ruff), and covered by a pytest suite.
 
-> Developed using Claude Code; `CLAUDE.md` contains the technical context file for AI-assisted sessions.
+> Developed using Claude Code, under a written agent contract (`CLAUDE.md`) and an automated
+> verification gate that runs on every agent edit - see
+> [Agent-assisted development workflow](#agent-assisted-development-workflow).
 
 ---
 
@@ -284,11 +286,60 @@ atlas-classifier/
 │   ├── xgboost_compare.py   # XGBoost benchmark with separate HPO
 │   └── inspect_h5.py        # Quick HDF5 structure dump
 ├── tests/                   # pytest suite
+├── CLAUDE.md                # Agent contract: locked decisions, invariants, workflow rules
+├── .claude/settings.json    # PostToolUse hook: verify every agent edit (ruff, pytest, mypy)
 ├── assets/                  # Plots embedded in this README
 ├── data/raw/                # ROOT files (gitignored)
 ├── data/processed/          # HDF5 + checkpoint + plots (gitignored)
 └── logs/                    # training.log, tune.log, xgboost_compare.log (appended)
 ```
+
+---
+
+## Agent-assisted development workflow
+
+This repository was built with an LLM coding agent (Claude Code) in the loop, and the two files
+that made that workable are tracked here deliberately: `CLAUDE.md` and `.claude/settings.json`.
+
+The failure mode that matters on a scientific codebase is not an agent writing code that does not
+run - that gets caught immediately. It is an agent writing plausible code that runs fine and
+quietly changes a number: a split that leaks, a weight applied twice, a threshold re-selected on
+the wrong sample. Those survive review precisely because the diff looks reasonable. Both files
+exist to close that gap.
+
+**`CLAUDE.md` is the agent contract, not documentation.** Its central element is a
+*Locked Decisions* table - channel, jet category, background normalisation, loss function,
+baseline definition - each with the reason it was chosen. Physics decisions here are the product
+of argument, not defaults, and an agent with no memory of that argument will cheerfully re-derive
+a settled choice into something more conventional and less correct. Writing the decisions down
+with their rationale turns them into constraints the agent carries into every session. The file
+also fixes the invariants that the numbers depend on: normalisation stats are fit on the training
+split only, physics weights apply to yields but not to ROC/KS, and the operating threshold is
+selected on validation and frozen before it is ever evaluated on test.
+
+**`.claude/settings.json` is the verification gate.** A `PostToolUse` hook fires on every `Edit`
+and `Write` the agent makes and immediately runs, against the whole package:
+
+```
+ruff check src/ scripts/ tests/ --fix      # lint, autofixing what is mechanical
+pytest tests/ -x -q                        # the full suite, failing fast
+mypy src/ scripts/                         # static types
+```
+
+The output is returned into the agent's context in the same turn as the edit. That timing is the
+entire point - the agent sees its own regression while it still has the reasoning that produced it
+loaded, and fixes the cause rather than the symptom. Verification is not a gate the work reaches at
+review time; it is a property of every individual edit. The practical effect is that the test suite
+stops being an artifact written after the fact and becomes the mechanism that constrains the agent,
+which is also why it is worth keeping the suite fast.
+
+**What this does not do.** The hook checks that the code is internally consistent and does what the
+tests say - it cannot tell whether the physics is right. Sample selection, feature motivation,
+whether a significance number is meaningful, and every entry in the Locked Decisions table are
+human calls, reviewed as such. The evaluation-integrity fix recorded as V6 under
+[Methodology evolution](#methodology-evolution) is a fair example: the pipeline was green
+throughout, because a threshold selected on the test set is a methodology error rather than a
+software defect. Automated checks buy speed and regression safety, not judgement.
 
 ---
 
