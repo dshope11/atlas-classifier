@@ -13,8 +13,8 @@ The pipeline goes from ATLAS Open Data ROOT ntuples -> engineered physics featur
 **What this demonstrates:**
 
 - **Data engineering** - a streaming pipeline from a binary scientific format (ROOT ntuples read in 100 MB chunks, so inputs larger than RAM are handled) into HDF5 and PyTorch.
-- **Leakage-safe preprocessing** - normalisation stats are fit on the training split only and shipped inside the model checkpoint, so inference can never see differently-scaled inputs.
-- **Systematic hyperparameter optimisation** - Optuna TPE search, run independently for the DNN and the XGBoost benchmark.
+- **Leakage-safe preprocessing** - normalization stats are fit on the training split only and shipped inside the model checkpoint, so inference can never see differently-scaled inputs.
+- **Systematic hyperparameter optimization** - Optuna TPE search, run independently for the DNN and the XGBoost benchmark.
 - **Evaluation methodology** - overtraining checks, binomial confidence bands on the ROC, two feature-importance methods, and a leakage-free threshold-selection protocol (selected on validation, frozen, evaluated once on test).
 - **Engineering hygiene** - typed (mypy), linted (ruff), and covered by a pytest suite.
 
@@ -130,11 +130,11 @@ Ten input features per event: five physics-motivated composite kinematic variabl
 | `data/raw/mc_<DSID>.root` | `download_data.py` | Raw ATLAS Open Data ntuples |
 | `data/processed/events.h5` | `data_loading.py` | Selected events as flat per-event scalars + `event_weight` + `is_signal`. Composite features are *not* stored here. |
 | `data/processed/split.h5` | `preprocessing.py` | Raw feature matrix, labels, and weights for each split + train-only scaler stats |
-| `data/processed/best_model.pt` | `train.py` | Weights + in-model normalisation (`register_buffer`) + feature schema. Self-describing for inference. |
+| `data/processed/best_model.pt` | `train.py` | Weights + in-model normalization (`register_buffer`) + feature schema. Self-describing for inference. |
 
 ### Using the trained model
 
-The checkpoint is fully self-describing - weights, architecture, normalisation stats, and feature schema in one file - so inference needs no sidecar files (run from the repo root):
+The checkpoint is fully self-describing - weights, architecture, normalization stats, and feature schema in one file - so inference needs no sidecar files (run from the repo root):
 
 ```python
 import torch
@@ -143,10 +143,10 @@ from src.model import HWWClassifier
 
 ckpt = torch.load("data/processed/best_model.pt", weights_only=True)
 model = HWWClassifier.from_checkpoint(ckpt, load_config("config.yaml"))
-p_signal = model.predict_proba(X)  # X: float32 tensor (n_events, 10), raw un-normalised features
+p_signal = model.predict_proba(X)  # X: float32 tensor (n_events, 10), raw un-normalized features
 ```
 
-Normalisation happens inside `forward()`, so `X` is the raw feature matrix as stored in `split.h5`.
+Normalization happens inside `forward()`, so `X` is the raw feature matrix as stored in `split.h5`.
 
 ---
 
@@ -168,7 +168,7 @@ Heuristic: if including a weight changes the relative balance between signal and
 
 HEP kinematic distributions are heavy-tailed (pT, mass). Mean and standard deviation are pulled by outliers; median and inter-quartile range are not. Small but real impact on training stability with extreme-pT events.
 
-### In-model normalisation via `register_buffer`
+### In-model normalization via `register_buffer`
 
 Median and IQR live as non-parameter tensors *inside* the model, registered via `register_buffer`. They move with `.to(device)` and are saved in the checkpoint automatically. The `.pt` file is fully self-describing for inference: no external scaler-stats sidecar is required, and the saved `feature_names` attribute catches feature-order mismatches at load time.
 
@@ -218,7 +218,7 @@ python src/data_loading.py
 python src/preprocessing.py
 ```
 
-### 5. (Optional) Hyperparameter optimisation (~10 min for 60 trials)
+### 5. (Optional) Hyperparameter optimization (~10 min for 60 trials)
 
 ```bash
 python scripts/tune.py --n-trials 60
@@ -310,12 +310,12 @@ the wrong sample. Those survive review precisely because the diff looks reasonab
 exist to close that gap.
 
 **`CLAUDE.md` is the agent contract, not documentation.** Its central element is a
-*Locked Decisions* table - channel, jet category, background normalisation, loss function,
+*Locked Decisions* table - channel, jet category, background normalization, loss function,
 baseline definition - each with the reason it was chosen. Physics decisions here are the product
 of argument, not defaults, and an agent with no memory of that argument will cheerfully re-derive
 a settled choice into something more conventional and less correct. Writing the decisions down
 with their rationale turns them into constraints the agent carries into every session. The file
-also fixes the invariants that the numbers depend on: normalisation stats are fit on the training
+also fixes the invariants that the numbers depend on: normalization stats are fit on the training
 split only, physics weights apply to yields but not to ROC/KS, and the operating threshold is
 selected on validation and frozen before it is ever evaluated on test.
 
@@ -343,7 +343,7 @@ whether a significance number is meaningful, and every entry in the Locked Decis
 human calls, reviewed as such. The evaluation-integrity fix recorded as V6 under
 [Methodology evolution](#methodology-evolution) is a fair example: the pipeline was green
 throughout, because a threshold selected on the test set is a methodology error rather than a
-software defect. Automated checks buy speed and regression safety, not judgement.
+software defect. Automated checks buy speed and regression safety, not judgment.
 
 ---
 
@@ -352,7 +352,7 @@ software defect. Automated checks buy speed and regression safety, not judgement
 Out-of-scope by design:
 
 - **Systematic uncertainties.** The Education-and-Outreach data tier doesn't expose per-event systematic variations as branches; treating them properly requires re-running with separate systematics ROOT files.
-- **Background normalisation factors from control regions.** Real ATLAS analyses fit MC normalisations from data sidebands; this pipeline uses luminosity weights only.
+- **Background normalization factors from control regions.** Real ATLAS analyses fit MC normalizations from data sidebands; this pipeline uses luminosity weights only.
 - **Real collision data.** ATLAS Open Data includes real pp collision data alongside the MC, but this pipeline trains and evaluates on MC only. Significance is computed entirely from MC yields using the Asimov approximation (treating the MC prediction as a stand-in for data) - standard practice for feasibility studies and classifier development before unblinding.
 - **Backgrounds beyond WW + ttbar.** $Z\to\tau\tau$ contributes ~1% in the 0-jet region after full selection per the Run 2 paper; data-driven fakes are not included.
 

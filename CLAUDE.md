@@ -17,7 +17,7 @@ and a measurable significance improvement over the cut-based baseline.
 |---|---|---|
 | Channel | H→WW→2lνν, signal vs. WW+tt̄ | No reconstructable invariant mass → ML has maximum leverage; WW is the irreducible background that defines the analysis |
 | Jet category | 0-jet (veto ≥1 jet) | tt̄ negligible after jet veto; WW dominant; Δφ_ll most powerful; cleanest ML story |
-| Background normalisation | MC luminosity weights only | No NFs from CRs — simplification noted in writeup; adds complexity without changing the ML demonstration |
+| Background normalization | MC luminosity weights only | No NFs from CRs — simplification noted in writeup; adds complexity without changing the ML demonstration |
 | Dataset | ATLAS O&E 2025e-13tev-beta release, `2to4lep` skim | Python-native, fits on laptop, pre-slimmed ntuples |
 | Intermediate format | HDF5 | Avoid re-running uproot each session |
 | Loss function | BCEWithLogitsLoss + pos_weight=n_bg/n_sig | Raw logit output; class-count balancing in loss only |
@@ -86,7 +86,7 @@ atlas-classifier/
      5 raw (lep_pt_lead, lep_pt_sublead, met, lep_eta_lead, lep_eta_sublead)
    - 70/15/15 stratified split (train/val/test) — stratified on is_signal
    - RobustScaler stats (median, IQR) from train split only → saved in checkpoint
-   - Output: split.h5 with raw (un-normalised) X/y/w per split + scaler stats
+   - Output: split.h5 with raw (un-normalized) X/y/w per split + scaler stats
 
 2a. (Optional) Tune (scripts/tune.py)
    - Optuna TPE search over hidden_sizes / dropout / lr / batch_size
