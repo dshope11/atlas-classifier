@@ -1,5 +1,5 @@
 {
-  "_comment": "Every agent edit is immediately verified: ruff --fix, then the pytest suite, then mypy, with output returned to the model in the same turn. PY points at the dedicated atlas-classifier conda env directly, avoiding a shell-init dependency; override it with ATLAS_CLASSIFIER_PYTHON.",
+  "_comment": "Every agent edit is immediately verified by .claude/hooks/check.sh: ruff --fix, then the pytest suite, then mypy. It is silent on a pass; on any failure it exits 2 with the output on stderr, which is what returns it to the model in the same turn (plain stdout on exit 0 never reaches the model).",
   "hooks": {
     "PostToolUse": [
       {
@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "PY=\"${ATLAS_CLASSIFIER_PYTHON:-/opt/homebrew/Caskroom/miniforge/base/envs/atlas-classifier/bin/python}\"; cd \"${CLAUDE_PROJECT_DIR:-.}\" && { $PY -m ruff check src/ scripts/ tests/ --fix 2>&1 | tail -10; $PY -m pytest tests/ -x -q --tb=short 2>&1 | tail -30; $PY -m mypy src/ scripts/ --ignore-missing-imports --no-error-summary 2>&1 | tail -20; }"
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check.sh"
           }
         ]
       }

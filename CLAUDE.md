@@ -159,8 +159,9 @@ quantitative demonstration of this.
 ## Workflow Rules
 
 - **Plan mode first** — before writing or editing any code, enter plan mode. No code without a plan.
-- **Self-validation hook** — configured in `.claude/settings.json`; runs pytest + mypy after
-  every file edit. Treat failures as blockers. Fix before moving on.
+- **Self-validation hook** — configured in `.claude/settings.json`, script in
+  `.claude/hooks/check.sh`; runs ruff --fix, pytest and mypy after every file edit. It is silent
+  on a pass and reports only failures. Treat failures as blockers. Fix before moving on.
 - **HDF5 intermediate** — never re-run the full uproot pipeline mid-session. Always load from
   `data/processed/`. Regenerate only if the schema changes.
 - **No Lightning** — plain `nn.Module` and manual training loop only.

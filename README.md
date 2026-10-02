@@ -288,6 +288,7 @@ atlas-classifier/
 ├── tests/                   # pytest suite
 ├── CLAUDE.md                # Agent contract: locked decisions, invariants, workflow rules
 ├── .claude/settings.json    # PostToolUse hook: verify every agent edit (ruff, pytest, mypy)
+├── .claude/hooks/check.sh   # The hook script: silent on a pass, returns failures to the agent
 ├── assets/                  # Plots embedded in this README
 ├── data/raw/                # ROOT files (gitignored)
 ├── data/processed/          # HDF5 + checkpoint + plots (gitignored)
@@ -299,7 +300,8 @@ atlas-classifier/
 ## Agent-assisted development workflow
 
 This repository was built with an LLM coding agent (Claude Code) in the loop, and the two files
-that made that workable are tracked here deliberately: `CLAUDE.md` and `.claude/settings.json`.
+that made that workable are tracked here deliberately: `CLAUDE.md` and `.claude/settings.json`
+(with the hook script it runs).
 
 The failure mode that matters on a scientific codebase is not an agent writing code that does not
 run - that gets caught immediately. It is an agent writing plausible code that runs fine and
@@ -326,8 +328,10 @@ pytest tests/ -x -q                        # the full suite, failing fast
 mypy src/ scripts/                         # static types
 ```
 
-The output is returned into the agent's context in the same turn as the edit. That timing is the
-entire point - the agent sees its own regression while it still has the reasoning that produced it
+Any failure is returned into the agent's context in the same turn as the edit; a clean pass returns
+nothing, so passing edits cost no context. That only works because the script exits with status 2
+on failure: a hook that just prints its results and exits 0 is invisible to the agent, since
+Claude Code sends that output to its debug log. The timing is the entire point - the agent sees its own regression while it still has the reasoning that produced it
 loaded, and fixes the cause rather than the symptom. Verification is not a gate the work reaches at
 review time; it is a property of every individual edit. The practical effect is that the test suite
 stops being an artifact written after the fact and becomes the mechanism that constrains the agent,

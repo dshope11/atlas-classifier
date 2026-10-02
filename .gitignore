@@ -22,9 +22,10 @@ venv/
 .venv/
 env/
 
-# Claude Code (settings.json is tracked; local overrides are not)
+# Claude Code (settings.json and the hook script are tracked; local overrides are not)
 .claude/*
 !.claude/settings.json
+!.claude/hooks/
 
 # Editor / OS
 .DS_Store
